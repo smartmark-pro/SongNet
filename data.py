@@ -275,3 +275,17 @@ class Vocab(object):
         if isinstance(x, list):
             return [self.token2idx(i) for i in x]
         return self._token2idx.get(x, self.unk_idx)
+
+
+if __name__ =="__main__":
+  lines = ["吴文英<s1>诉衷情<s2>西风吹鹤到人间。</s>凉月满缑山。</s>银河万里秋浪，重载客槎还。</s>河汉女，巧云鬟。</s>夜阑干。</s>钗头新约，针眼娇颦，楼上秋寒。", 
+      "蔡楠<s1>诉衷情<s2>夕阳低户水当楼。</s>风烟惨淡秋。</s>乱云飞尽碧山留。</s>寒沙卧海鸥。</s>浑似画，只供愁。</s>相看空泪流。</s>故人如欲问安不。</s>病来今白头。"]
+  for line in lines:
+    xs_tpl, xs_seg, xs_pos, ys, ys_tpl, ys_seg, ys_pos = parse_line(line, 300, 2)
+    print(xs_tpl, xs_seg, xs_pos,)
+    print(ys, ys_tpl, ys_seg, ys_pos)
+  
+  for line in lines:
+    xs_tpl, xs_seg, xs_pos, ys, ys_tpl, ys_seg, ys_pos = parse_line_polish(line, 300, 2)
+    print(xs_tpl, xs_seg, xs_pos,)
+    print(ys, ys_tpl, ys_seg, ys_pos)
