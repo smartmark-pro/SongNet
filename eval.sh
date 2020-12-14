@@ -1,5 +1,5 @@
 #!/bin/bash
-path=./ckpt/
+path=/content/ckpt/
 FILES=$path/*
 for f in $FILES; do
     echo "==========================" ${f##*/}
