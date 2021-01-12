@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=1 \
+CUDA_VISIBLE_DEVICES=0 \
 python3 -u train.py --embed_dim 768 \
                       --ff_embed_dim 3072 \
                       --num_heads 12 \
