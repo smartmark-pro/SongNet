@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.multiprocessing as mp
 
 from biglm import BIGLM
-from data import Vocab, DataLoader, s2xy
+from data import Vocab, DataLoader, s2xy, new_s2xy
 from optim import Optim
 
 import argparse
@@ -86,7 +86,7 @@ def eval_epoch(lm_args, model, lm_vocab, local_rank, label):
     count = 0.
     while idx < len(ds):
         cplb = ds[idx:idx + batch_size]
-        xs_tpl, xs_seg, xs_pos, ys_truth, ys_inp, ys_tpl, ys_seg, ys_pos, msk = s2xy(
+        xs_tpl, xs_seg, xs_pos, ys_truth, ys_inp, ys_tpl, ys_seg, ys_pos, msk = new_s2xy(
             cplb, lm_vocab, lm_args.max_len, lm_args.min_len)
 
         xs_tpl = xs_tpl.cuda(local_rank)

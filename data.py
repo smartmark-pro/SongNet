@@ -5,14 +5,15 @@ import numpy as np
 PAD, UNK, BOS, EOS = '<pad>', '<unk>', '<bos>', '<eos>'
 BOC, EOC = '<boc>', '<eoc>'
 LS, RS, SP = '<s>', '</s>', ' '
-CS = ['<c-1>'] + ['<c' + str(i) + '>' for i in range(32)] # content
-SS = ['<s-1>'] + ['<s' + str(i) + '>' for i in range(512)] # segnment
-PS = ['<p-1>'] + ['<p' + str(i) + '>' for i in range(512)] # position
-TS = ['<t-1>'] + ['<t' + str(i) + '>' for i in range(32)] # other types
+CS = ['<c-1>'] + ['<c' + str(i) + '>' for i in range(32)]  # content
+SS = ['<s-1>'] + ['<s' + str(i) + '>' for i in range(512)]  # segnment
+PS = ['<p-1>'] + ['<p' + str(i) + '>' for i in range(512)]  # position
+TS = ['<t-1>'] + ['<t' + str(i) + '>' for i in range(32)]  # other types
 
 PUNCS = set([",", ".", "?", "!", ":", "，", "。", "？", "！", "："])
 
 BUFSIZE = 4096000
+
 
 def ListsToTensor(xs, vocab=None):
     max_len = max(len(x) for x in xs)
@@ -25,38 +26,42 @@ def ListsToTensor(xs, vocab=None):
         ys.append(y)
     return ys
 
+
 def _back_to_text_for_check(x, vocab):
     w = x.t().tolist()
     for sent in vocab.idx2token(w):
-        print (' '.join(sent))
-    
+        print(' '.join(sent))
+
+
 def batchify(data, vocab):
     xs_tpl, xs_seg, xs_pos, \
-    ys_truth, ys_inp, \
-    ys_tpl, ys_seg, ys_pos, msk = [], [], [], [], [], [], [], [], []
+        ys_truth, ys_inp, \
+        ys_tpl, ys_seg, ys_pos, msk = [], [], [], [], [], [], [], [], []
     for xs_tpl_i, xs_seg_i, xs_pos_i, ys_i, ys_tpl_i, ys_seg_i, ys_pos_i in data:
         xs_tpl.append(xs_tpl_i)
         xs_seg.append(xs_seg_i)
         xs_pos.append(xs_pos_i)
-        
+
         ys_truth.append(ys_i)
         ys_inp.append([BOS] + ys_i[:-1])
         ys_tpl.append(ys_tpl_i)
         ys_seg.append(ys_seg_i)
         ys_pos.append(ys_pos_i)
-        
+
         msk.append([1 for i in range(len(ys_i))])
 
     xs_tpl = torch.LongTensor(ListsToTensor(xs_tpl, vocab)).t_().contiguous()
     xs_seg = torch.LongTensor(ListsToTensor(xs_seg, vocab)).t_().contiguous()
     xs_pos = torch.LongTensor(ListsToTensor(xs_pos, vocab)).t_().contiguous()
-    ys_truth = torch.LongTensor(ListsToTensor(ys_truth, vocab)).t_().contiguous()
+    ys_truth = torch.LongTensor(ListsToTensor(
+        ys_truth, vocab)).t_().contiguous()
     ys_inp = torch.LongTensor(ListsToTensor(ys_inp, vocab)).t_().contiguous()
     ys_tpl = torch.LongTensor(ListsToTensor(ys_tpl, vocab)).t_().contiguous()
     ys_seg = torch.LongTensor(ListsToTensor(ys_seg, vocab)).t_().contiguous()
     ys_pos = torch.LongTensor(ListsToTensor(ys_pos, vocab)).t_().contiguous()
     msk = torch.FloatTensor(ListsToTensor(msk)).t_().contiguous()
     return xs_tpl, xs_seg, xs_pos, ys_truth, ys_inp, ys_tpl, ys_seg, ys_pos, msk
+
 
 def s2t(strs, vocab):
     inp, msk = [], []
@@ -68,6 +73,7 @@ def s2t(strs, vocab):
     msk = torch.FloatTensor(ListsToTensor(msk)).t_().contiguous()
     return inp, msk
 
+
 def s2xy(lines, vocab, max_len, min_len):
     data = []
     for line in lines:
@@ -75,7 +81,116 @@ def s2xy(lines, vocab, max_len, min_len):
         if not res:
             continue
         data.append(res)
-    return  batchify(data, vocab)
+    return batchify(data, vocab)
+
+
+def new_s2xy(lines, vocab, max_len, min_len):
+    data = []
+    for line in lines:
+        res = gen_parse_line(line, max_len, min_len)
+        if not res:
+            continue
+        for p in res:
+            data.append(p)
+    return batchify(data, vocab)
+
+
+def gen_parse_line(line, max_len, min_len, bound=300):
+    line, text = line.split("\t")
+    # print(len(line), len(text))
+    # if not line:
+    #     return None
+    fs = line.split("<s2>")
+    question, gen_name = fs[0].split("<s1>")
+    tpl = fs[1].strip()
+    # assert len(tpl) == len(text)
+    # print(len(tpl), len(text))
+    #超过这部分的长度, 做分段
+    if len(tpl) < min_len:
+        return []
+    if len(tpl) <= max_len:
+        tpl_array = [(0, len(tpl))]
+    else:
+        # 分段必须要按句分, 不能有断开
+        # . 的数据处理错误
+        n = len(text)
+        last_punc = -1
+        cur = 0
+        tpl_array = []
+        for i in range(n):
+            if text[i] in PUNCS:
+                last_punc = i+4
+            if i > 0 and i % max_len == 0:
+                # 可能会出错误, 最后会加一个eos
+                tpl_array.append((cur, last_punc))
+                cur = last_punc+1
+        if cur < len(tpl):
+            tpl_array.append((cur, len(tpl)))
+    rs = []
+    # print(tpl_array)
+    for i, (start, end) in enumerate(tpl_array):
+        tpl_sents = tpl[start:end+1].split("</s>")
+        sents = text[start:end+1].split("</s>")
+        # print(tpl_sents, sents) # 分句
+        ys = []
+        xs_tpl = []
+        xs_seg = []
+        xs_pos = []
+
+        # 需要增加问题, 类别, 拆分序号.
+        # 问题可能增加了一些信息但是也可能带来一些无意信息, 而且是变长的, 这里没法合理的放置
+        #
+        idx = "<p-{}>".format(i)
+        ws = [w for w in gen_name]
+
+        xs_tpl = ws + [i] + [EOC]
+        xs_seg = [SS[0] for w in ws] + [idx] + [EOC]
+        xs_pos = [SS[j+bound] for j in range(len(ws))] + [idx] + [EOC]
+
+        ys_tpl = []
+        ys_seg = []
+        ys_pos = []
+        for si, sent in enumerate(sents):
+            ws = []
+            sent = sent.strip()
+            if not sent:
+                continue
+            # print(sent)
+            for k, w in enumerate(sent):
+                ws.append(w)
+                if w.strip() and w not in PUNCS:
+                    # print(si, k, sent)
+                    if tpl_sents[si][k] == "_":
+                        ys_tpl.append(CS[3])
+                    else:
+                        ys_tpl.append(CS[2])
+                else:
+                    ys_tpl.append(CS[1])
+            ys += ws + [RS]
+            # 直接替换
+            # if ws[-1] in PUNCS:
+            #     ys_tpl[-2] = CS[3]
+            # else:
+            #     ys_tpl[-1] = CS[3]
+            ys_tpl += [RS]
+            ys_seg += [SS[si + 1] for w in ws] + [RS]
+            ys_pos += [PS[len(ws) - i] for i in range(len(ws))] + [RS]
+        ys += [EOS]
+        ys_tpl += [EOS]
+        ys_seg += [EOS]
+        ys_pos += [EOS]
+
+        xs_tpl += ys_tpl
+        xs_seg += ys_seg
+        xs_pos += ys_pos
+
+        # print(ys)
+        if len(ys) < min_len:
+            return []
+
+        rs.append((xs_tpl, xs_seg, xs_pos, ys, ys_tpl, ys_seg, ys_pos))
+    return rs
+
 
 def parse_line(line, max_len, min_len):
     line = line.strip()
@@ -132,17 +247,19 @@ def parse_line(line, max_len, min_len):
     xs_tpl += ys_tpl
     xs_seg += ys_seg
     xs_pos += ys_pos
-    
+
     if len(ys) < min_len:
         return None
     return xs_tpl, xs_seg, xs_pos, ys, ys_tpl, ys_seg, ys_pos
+
 
 def s2xy_polish(lines, vocab, max_len, min_len):
     data = []
     for line in lines:
         res = parse_line_polish(line, max_len, min_len)
         data.append(res)
-    return  batchify(data, vocab)
+    return batchify(data, vocab)
+
 
 def parse_line_polish(line, max_len, min_len):
     line = line.strip()
@@ -195,11 +312,12 @@ def parse_line_polish(line, max_len, min_len):
     xs_tpl += ys_tpl
     xs_seg += ys_seg
     xs_pos += ys_pos
-    
+
     if len(ys) < min_len:
         return None
 
     return xs_tpl, xs_seg, xs_pos, ys, ys_tpl, ys_seg, ys_pos
+
 
 class DataLoader(object):
     def __init__(self, vocab, filename, batch_size, max_len_y, min_len_y):
@@ -212,7 +330,7 @@ class DataLoader(object):
         self.epoch_id = 0
 
     def __iter__(self):
-        
+
         lines = self.stream.readlines(BUFSIZE)
 
         if not lines:
@@ -222,25 +340,26 @@ class DataLoader(object):
             lines = self.stream.readlines(BUFSIZE)
 
         data = []
-        for line in lines[:-1]: # the last sent may be imcomplete
+        for line in lines[:-1]:  # the last sent may be imcomplete
             res = parse_line(line, self.max_len_y, self.min_len_y)
             if not res:
                 continue
             data.append(res)
-        
+
         random.shuffle(data)
-        
+
         idx = 0
         while idx < len(data):
             yield batchify(data[idx:idx+self.batch_size], self.vocab)
             idx += self.batch_size
 
+
 class Vocab(object):
-    def __init__(self, filename, min_occur_cnt, specials = None):
+    def __init__(self, filename, min_occur_cnt, specials=None):
         idx2token = [PAD, UNK, BOS, EOS] + [BOC, EOC, LS, RS, SP] + CS + SS + PS + TS \
-                    +  (specials if specials is not None else [])
+            + (specials if specials is not None else [])
         for line in open(filename, encoding='utf8').readlines():
-            try: 
+            try:
                 token, cnt = line.strip().split()
             except:
                 continue
@@ -254,15 +373,15 @@ class Vocab(object):
     @property
     def size(self):
         return len(self._idx2token)
-    
+
     @property
     def unk_idx(self):
         return self._unk_idx
-    
+
     @property
     def padding_idx(self):
         return self._padding_idx
-    
+
     def random_token(self):
         return self.idx2token(1 + np.random.randint(self.size-1))
 
@@ -277,19 +396,25 @@ class Vocab(object):
         return self._token2idx.get(x, self.unk_idx)
 
 
-if __name__ =="__main__":
-  lines = ["吴文英<s1>诉衷情<s2>西风吹鹤到人间。</s>凉月满缑山。</s>银河万里秋浪，重载客槎还。</s>河汉女，巧云鬟。</s>夜阑干。</s>钗头新约，针眼娇颦，楼上秋寒。", 
-      "蔡楠<s1>诉衷情<s2>夕阳低户水当楼。</s>风烟惨淡秋。</s>乱云飞尽碧山留。</s>寒沙卧海鸥。</s>浑似画，只供愁。</s>相看空泪流。</s>故人如欲问安不。</s>病来今白头。"]
-  name = ["xs_tpl", "xs_seg", "xs_pos", "ys", "ys_tpl", "ys_seg", "ys_pos"]
-  for line in lines:
-    print("line", line)
-    rs = parse_line(line, 300, 2)
-    for i in range(len(rs)):
-      print(name[i], rs[i])
-    print()
-  for line in lines:
-    print("line", line)
-    rs = parse_line_polish(line, 300, 2)
-    for i in range(len(rs)):
-      print(name[i], rs[i])
-    print()
+if __name__ == "__main__":
+    #   lines = ["吴文英<s1>诉衷情<s2>西风吹鹤到人间。</s>凉月满缑山。</s>银河万里秋浪，重载客槎还。</s>河汉女，巧云鬟。</s>夜阑干。</s>钗头新约，针眼娇颦，楼上秋寒。",
+    #       "蔡楠<s1>诉衷情<s2>夕阳低户水当楼。</s>风烟惨淡秋。</s>乱云飞尽碧山留。</s>寒沙卧海鸥。</s>浑似画，只供愁。</s>相看空泪流。</s>故人如欲问安不。</s>病来今白头。"]
+    lines = ["在慈溪中学李晓燕老师班里就读是什么体验？<s1>苏联笑话-6<s2>__举行盛大五一节游行，</s>__率_______全体出席，</s>检阅游行队伍。</s>就在游行队伍通过主席台的时候，</s>_``_同志突然发现人群中有一个人掏出一把___了_几天__的_，</s>于是他马上对身边的______：“我敢打赌，</s>这个_____的人里面没穿内裤！</s>”_____不以为然，</s>难道__同志真长了透视眼不成？</s>_马上命令警卫把那个人叫道跟前，</s>亲自询问，</s>吃惊地发现，</s>这人长裤里面果然是光着的。</s>_______地问领袖：“__同志，</s>您是如何知道透过外衣看见他没穿内裤的？</s>”__回答：“我看见他掏出了新__，</s>他的___显然没用来买内裤嘛。</s>”众人大惊，</s>无不佩服领袖超凡的洞察力……	慈中举行盛大五一节游行，</s>校长率各年级优秀教师全体出席，</s>检阅游行队伍。</s>就在游行队伍通过主席台的时候，</s>校长同志突然发现人群中有一个人掏出一把梳子梳了梳几天没洗的头，</s>于是他马上对身边的miss李道：“我敢打赌，</s>这个拿梳子梳头的人里面没穿内裤！</s>”miss李不以为然，</s>难道校长同志真长了透视眼不成？</s>她马上命令警卫把那个人叫道跟前，</s>亲自询问，</s>吃惊地发现，</s>这人长裤里面果然是光着的。</s>miss李敬佩地问领袖：“校长同志，</s>您是如何知道透过外衣看见他没穿内裤的？</s>”校长回答：“我看见他掏出了新梳子，</s>他的零花钱显然没用来买内裤嘛。</s>”众人大惊，</s>无不佩服领袖超凡的洞察力……"]
+    name = ["xs_tpl", "xs_seg", "xs_pos", "ys", "ys_tpl", "ys_seg", "ys_pos"]
+    # 模板(原题+012), 分句标记, 倒叙句内标记, 无标题原句单字(结果y), 模板(无标题+012), 分句标记(无标题), 倒叙句内标记(无标记)
+    # 感觉不知道怎么对抗这种分割后有一定偏移的情形
+    #
+    for line in lines:
+        print("line", line)
+        rs = gen_parse_line(line, 300, 2)
+        print(len(rs))
+        for i in range(len(rs)):
+            for j in range(len(rs[i])):
+                print(name[j], rs[i][j])
+            print()
+    # for line in lines:
+    #     print("line", line)
+    #     rs = parse_line_polish(line, 300, 2)
+    #     for i in range(len(rs)):
+    #         print(name[i], rs[i])
+    #     print()

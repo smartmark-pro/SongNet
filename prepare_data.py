@@ -39,7 +39,10 @@ with open(f_ci) as f:
         if topic not in docs:
             docs[topic] = []
         docs[topic].append(author + "<s1>" + topic + "<s2>" + '</s>'.join(sents))
+for k, v in docs.items():
+    print(k, len(v), end="\t")
 
+print(len(docs))
 
 topics = list(docs.keys())
 
