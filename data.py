@@ -104,7 +104,7 @@ def gen_parse_line(line, max_len, min_len, bound=300):
     question, gen_name = fs[0].split("<s1>")
     tpl = fs[1].strip()
     # assert len(tpl) == len(text)
-    # print(len(tpl), len(text))
+    print(len(tpl), len(text))
     #超过这部分的长度, 做分段
     if len(tpl) < min_len:
         return []
@@ -341,10 +341,15 @@ class DataLoader(object):
 
         data = []
         for line in lines[:-1]:  # the last sent may be imcomplete
-            res = parse_line(line, self.max_len_y, self.min_len_y)
+            # res = parse_line(line, self.max_len_y, self.min_len_y)
+            # if not res:
+            #     continue
+            # data.append(res)
+            res = gen_parse_line(line, self.max_len_y, self.min_len_y)
             if not res:
                 continue
-            data.append(res)
+            for p in res:
+                data.append(p)
 
         random.shuffle(data)
 
