@@ -7,7 +7,7 @@ import pandas as pd
 random.seed(10)
 
 example_df = pd.read_excel(
-    "/content/drive/MyDrive/new_examples.xlsx")
+    "./data/new_examples.xlsx")
 # /content/drive/MyDrive/examples.xlsx
 # ./data/new_examples.xlsx
 
@@ -24,15 +24,16 @@ def add_split_tag(text, ftext):
     new_ftext = []
     c = 0
 
-    if len(text) == 0 or len(ftext) == 0:
-        print(text, ftext)
-        return "".join(new_text), "".join(new_ftext), c
+    # if len(text) == 0 or len(ftext) == 0:
+    #     print(text, ftext)
+    #     return "".join(new_text), "".join(new_ftext), c
     for i in range(len(text)):
         if text[i] in set(["？", "！", "，", "。"]):
             new_text.append(text[i] + "</s>")
             new_ftext.append(ftext[i] + "</s>")
             c += 1
-        elif i == "\n":
+        elif text[i] == "\n":
+            # 必须去掉换行, 否则放到txt中无法使用
             continue
         else:
             new_text.append(text[i])
@@ -49,7 +50,7 @@ for i, item in enumerate(data):
         str(item["标准化内容"]), str(item["标准化模板"]))
 
     text = ("{}<s1>{}<s2>{}".format(
-        item["仿写对象"], item["梗和主题"], new_format), new_text)
+        str(item["仿写对象"]).replace("\n", ""), str(item["梗和主题"]).replace("\n", ""), new_format), new_text)
     if len(new_format) != len(new_text):
         print(i, c, c2, len(new_format), len(new_text),
               new_format[:100], new_text[:100])
