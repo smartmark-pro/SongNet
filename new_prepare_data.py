@@ -7,7 +7,7 @@ import pandas as pd
 random.seed(10)
 
 example_df = pd.read_excel(
-    "./data/new_examples.xlsx")
+    "/content/drive/MyDrive/new_examples.xlsx")
 # /content/drive/MyDrive/examples.xlsx
 # ./data/new_examples.xlsx
 
@@ -50,7 +50,7 @@ for i, item in enumerate(data):
         str(item["标准化内容"]), str(item["标准化模板"]))
 
     text = ("{}<s1>{}<s2>{}".format(
-        str(item["仿写对象"]).replace("\n", ""), str(item["梗和主题"]).replace("\n", ""), new_format), new_text)
+        str(item["仿写对象"]).replace("\n", "").replace("\t", ""), str(item["梗和主题"]).replace("\n", "").replace("\t", ""), new_format.replace("\n", "").replace("\t", "")), new_text.replace("\n", "").replace("\t", ""))
     if len(new_format) != len(new_text):
         print(i, c, c2, len(new_format), len(new_text),
               new_format[:100], new_text[:100])
