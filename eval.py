@@ -10,7 +10,7 @@ import time
 from biglm import BIGLM
 from data import Vocab, DataLoader, s2t, s2xy, new_s2xy
 
-gpu = int(sys.argv[2]) if len(sys.argv) > 1 else 0
+gpu = 0  # int(sys.argv[2]) if len(sys.argv) > 1 else 0
 
 
 def init_model(m_path, device, vocab):
@@ -18,7 +18,7 @@ def init_model(m_path, device, vocab):
     lm_args = ckpt['args']
     lm_vocab = Vocab(vocab, min_occur_cnt=lm_args.min_occur_cnt, specials=[])
     lm_model = BIGLM(device, lm_vocab, lm_args.embed_dim, lm_args.ff_embed_dim,
-                     lm_args.num_heads, lm_args.dropout, lm_args.layers, 0.1, lm_args.approx)
+                     lm_args.num_heads, lm_args.dropout, lm_args.layers, 0.1)  # , lm_args.approx
     lm_model.load_state_dict(ckpt['model'])
     lm_model = lm_model.cuda(device)
     lm_model.eval()
