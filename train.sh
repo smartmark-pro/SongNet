@@ -4,8 +4,8 @@ python3 -u train.py --embed_dim 768 \
                       --num_heads 12 \
                       --layers 12 \
                       --dropout 0.2 \
-                      --train_data /content/drive/MyDrive/r_data/r_train.txt \
-                      --dev_data /content/drive/MyDrive/r_data/r_dev.txt \
+                      --train_data ./data/r_train.txt \
+                      --dev_data ./data/r_dev.txt \
                       --vocab ./data/vocab.txt \
                       --min_occur_cnt 1 \
                       --batch_size 8 \

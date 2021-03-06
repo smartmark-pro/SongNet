@@ -154,13 +154,23 @@ def run(args, local_rank):
             model.zero_grad()
             res, loss, acc, nll, ppl, ntokens, npairs = model(
                 xs_tpl, xs_seg, xs_pos, ys_truth, ys_inp, ys_tpl, ys_seg, ys_pos, msk)
-            loss_acm += loss.item()
-            acc_acm += acc
-            nll_acm += nll
-            ppl_acm += ppl
-            ntokens_acm += ntokens
-            npairs_acm += npairs
+
+            # http://www.myzaker.com/article/5f3747a28e9f096c723a65e0/ 资料
+            # 常用的文本生成评测指标 PPL、Distinct 外，
+            # 本文还专门设计了衡量格式（Format）准确率、韵律（Rhyme）准确率和句子完整性（integrity）的指标。
+            # 格式（Format）准确率: Precision p、Recall r 和 F1 得分-> Macro-F1 和 Micro-F1
+            # 完整性有个奇怪的log值
+            # 传统的BLEU和ROUGE, 再songnet中完全用不到, 创作要求多样性
+            loss_acm += loss.item()  # 损失
+            acc_acm += acc  # 精确度
+            nll_acm += nll  #
+            ppl_acm += ppl  # -log 和, 其实就是句子出现的概率, 越小, 困惑度越高
+            # 新指标, 困惑度perplexity, 比较两者再预测样本上的优劣, 困惑都越低越好??, 咋定义的
+            ntokens_acm += ntokens  # 字符数
+            npairs_acm += npairs  # 句子?
             nxs += npairs
+
+            # 为什么啊, 感觉好难啊gpt2
 
             loss.backward()
             if args.world_size > 1:

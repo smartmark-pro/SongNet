@@ -310,7 +310,7 @@ def beam_search(enc, src_padding_mask, ys_tpl, ys_seg, ys_pos, s):
 
 
 ds = []
-with open("./data/test.txt", "r") as f:
+with open("./data/r_test.txt", "r") as f:
     for line in f:
         line = line.strip()
         if line:
