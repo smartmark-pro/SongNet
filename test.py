@@ -37,8 +37,8 @@ def init_model(m_path, device, vocab):
     return lm_model, lm_vocab, lm_args
 
 
-m_path = "./model/songci.ckpt"
-lm_model, lm_vocab, lm_args = init_model(m_path, gpu, "./model/vocab.txt")
+m_path = ""  # "./model/songnet_songci/songci.ckpt"
+lm_model, lm_vocab, lm_args = init_model(m_path, gpu, "./data/vocab.txt")
 
 
 k = 32

@@ -6,9 +6,11 @@ PAD, UNK, BOS, EOS = '<pad>', '<unk>', '<bos>', '<eos>'
 BOC, EOC = '<boc>', '<eoc>'
 LS, RS, SP = '<s>', '</s>', ' '
 CS = ['<c-1>'] + ['<c' + str(i) + '>' for i in range(32)]  # content
-SS = ['<s-1>'] + ['<s' + str(i) + '>' for i in range(512)]  # segnment
-PS = ['<p-1>'] + ['<p' + str(i) + '>' for i in range(512)]  # position
-TS = ['<t-1>'] + ['<t' + str(i) + '>' for i in range(32)]  # other types
+SS = ['<s-1>'] + ['<s-2>'] + \
+    ['<s' + str(i) + '>' for i in range(512)]  # segnment
+PS = ['<p-1>'] + ['<p-2>'] + \
+    ['<p' + str(i) + '>' for i in range(512)]  # position
+TS = ['<t-1>'] + ['<t-2>'] + ['<t' + str(i) + '>' for i in range(32)]
 
 PUNCS = set([",", ".", "?", "!", ":", "，", "。", "？", "！", "："])
 
@@ -149,12 +151,20 @@ def gen_parse_line(line, max_len, min_len, bound=300):
         # 需要增加问题, 类别, 拆分序号.
         # 问题可能增加了一些信息但是也可能带来一些无意信息, 而且是变长的, 这里没法合理的放置
         #
-        idx = "<p-{}>".format(i)
+        # idx = "<p-{}>".format(i)
         ws = [w for w in gen_name]
+        repeater = [q for q in question]
 
-        xs_tpl = ws + [i] + [EOC] + list(question) + [EOC]
-        xs_seg = [SS[0] for w in ws] + [idx] + [EOC]
-        xs_pos = [SS[j+bound] for j in range(len(ws))] + [idx] + [EOC]
+        # 模板中是数字, 其它是符号index 是不是不对啊
+        # 这里再seg, pos 只用seg编码, 应该不算错误吧
+        #
+        xs_tpl = ws + [i] + [EOC] + repeater + [EOC]
+        xs_seg = [SS[0] for _ in ws] + [i] + [EOC] + [SS[1]
+                                                      for _ in repeater] + [EOC]
+        # 从ss300开始可能是因为倒着的缘故
+        # 但是这里用一个值表示, 会不会不能表示位置啊?
+        xs_pos = [PS[bound+j] for j in range(
+            len(ws))] + [i] + [EOC] + [PS[bound+j] for _ in range(len(repeater))] + [EOC]
 
         ys_tpl = []
         ys_seg = []
@@ -169,11 +179,15 @@ def gen_parse_line(line, max_len, min_len, bound=300):
                 ws.append(w)
                 if w.strip() and w not in PUNCS:
                     # print(si, k, sent)
+
                     if tpl_sents[si][k] == "_":
+                        # 可变化的文字
                         ys_tpl.append(CS[3])
                     else:
+                        # 不可变的文字
                         ys_tpl.append(CS[2])
                 else:
+                    # 标点符号
                     ys_tpl.append(CS[1])
             ys += ws + [RS]
             # 直接替换
@@ -182,8 +196,9 @@ def gen_parse_line(line, max_len, min_len, bound=300):
             # else:
             #     ys_tpl[-1] = CS[3]
             ys_tpl += [RS]
-            ys_seg += [SS[si + 1] for w in ws] + [RS]
-            ys_pos += [PS[len(ws) - i] for i in range(len(ws))] + [RS]
+            ys_seg += [SS[si + 2] for w in ws] + [RS]
+            ys_pos += [PS[i + 2] for i in range(len(ws))] + [RS]
+            # 因为总是韵脚, 所以倒着来更好一些,但是梗仿写不需要
         ys += [EOS]
         ys_tpl += [EOS]
         ys_seg += [EOS]
@@ -420,7 +435,7 @@ if __name__ == "__main__":
         print("line", line)
         rs = parse_line(line, 300, 2)  # _polish
         for i in range(len(rs)):
-            print(name[i], rs[i])
+            print(name[i], len(rs[i]), rs[i])
         print()
 
     # line 蔡楠<s1>诉衷情<s2>夕阳低户水当楼。</s>风烟惨淡秋。</s>乱云飞尽碧山留。</s>寒沙卧海鸥。</s>浑似画，只供愁。</s>相看空泪流。</s>故人如欲问安不。</s>病来今白头。
@@ -450,5 +465,5 @@ if __name__ == "__main__":
         print(len(rs))
         for i in range(len(rs)):
             for j in range(len(rs[i])):
-                print(name[j], rs[i][j])
+                print(name[j], len(rs[i][j]), rs[i][j])
             print()
