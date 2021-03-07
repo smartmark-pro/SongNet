@@ -4,10 +4,12 @@ import re
 from collections import Counter
 import random
 import pandas as pd
+from collections import Counter
+cnt = Counter()
 random.seed(10)
 
 example_df = pd.read_excel(
-    "/content/drive/MyDrive/new_examples.xlsx")
+    "./data/new_examples.xlsx")
 # /content/drive/MyDrive/examples.xlsx
 # ./data/new_examples.xlsx
 
@@ -16,6 +18,10 @@ print(example_df.shape)
 data = example_df.to_dict("records")
 
 category_data = collections.defaultdict(list)
+
+
+def remove_nt(s):
+    return str(s).replace("\n", "").replace("\t", "")
 
 
 def add_split_tag(text, ftext):
@@ -39,18 +45,25 @@ def add_split_tag(text, ftext):
             new_text.append(text[i])
             new_ftext.append(ftext[i])
 
-    return "".join(new_text), "".join(new_ftext), c
+    return remove_nt("".join(new_text)), remove_nt("".join(new_ftext)), c
 
 
 c = 0
+
 for i, item in enumerate(data):
     # 需要把每一句对上加一个</s>
     # 把标点直接替换成
     new_text, new_format, c2 = add_split_tag(
         str(item["标准化内容"]), str(item["标准化模板"]))
+    item["仿写对象"] = remove_nt(item["仿写对象"])
+    item["梗和主题"] = remove_nt(item["梗和主题"])
 
     text = ("{}<s1>{}<s2>{}".format(
-        str(item["仿写对象"]).replace("\n", "").replace("\t", ""), str(item["梗和主题"]).replace("\n", "").replace("\t", ""), new_format.replace("\n", "").replace("\t", "")), new_text.replace("\n", "").replace("\t", ""))
+        item["仿写对象"], item["梗和主题"], new_format), new_text)
+    cnt.update(list(item["仿写对象"]))
+    cnt.update(list(item["梗和主题"]))
+    cnt.update(list(remove_nt(item["标准化内容"])))
+
     if len(new_format) != len(new_text):
         print(i, c, c2, len(new_format), len(new_text),
               new_format[:100], new_text[:100])
@@ -64,7 +77,7 @@ print(len(category_data), c)
 all, tc = 0, 0
 new_category_data = collections.defaultdict(list)
 for k, v in category_data.items():
-    if len(v) >= 4:  # 一个梗至少有四个结果
+    if len(v) >= 4:  # 一个梗至少有四个仿写
         print(k, len(v), end="\t")
         tc += 1
         all += len(v)
@@ -104,3 +117,10 @@ def get_data(keys, name):
 train_data = get_data(train_obj, "train")
 dev_data = get_data(dev_obj, "dev")
 test_data = get_data(test_obj, "test")
+
+print("vocab")
+print(len(cnt))  # 5310 + 1024+9 + 64 = 6407 + 几个字.
+with open('./data/vocab.txt', 'w', encoding='utf8') as f:
+    for x, y in cnt.most_common():
+        f.write(x + '\t' + str(y) + '\n')
+print("done")

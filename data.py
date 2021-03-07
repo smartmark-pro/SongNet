@@ -152,7 +152,7 @@ def gen_parse_line(line, max_len, min_len, bound=300):
         idx = "<p-{}>".format(i)
         ws = [w for w in gen_name]
 
-        xs_tpl = ws + [i] + [EOC]
+        xs_tpl = ws + [i] + [EOC] + list(question) + [EOC]
         xs_seg = [SS[0] for w in ws] + [idx] + [EOC]
         xs_pos = [SS[j+bound] for j in range(len(ws))] + [idx] + [EOC]
 
