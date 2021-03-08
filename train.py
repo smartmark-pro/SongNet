@@ -12,6 +12,7 @@ from optim import Optim
 import argparse
 import os
 import random
+import datetime
 print(torch.cuda.device_count())
 print(torch.cuda.is_available())
 
@@ -184,6 +185,8 @@ def run(args, local_rank):
                 print("gradient: none, gpu: " + str(local_rank), flush=True)
                 continue
             if (args.world_size == 1 or dist.get_rank() == 0) and batch_acm % args.print_every == -1 % args.print_every:
+                today = datetime.datetime.now()
+                print(today)
                 print('batch_acm %d, loss %.3f, acc %.3f, nll %.3f, ppl %.3f, x_acm %d, lr %.6f'
                       % (batch_acm, loss_acm/args.print_every, acc_acm/ntokens_acm,
                          nll_acm/nxs, ppl_acm/nxs, npairs_acm, optimizer._rate), flush=True)

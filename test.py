@@ -19,7 +19,8 @@ def init_seeds():
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(123)
 
-# init_seeds()
+
+init_seeds()
 
 
 gpu = 0
@@ -50,10 +51,13 @@ def top_k_inc(enc, src_padding_mask, inp_ys_tpl, inp_ys_seg, inp_ys_pos, s):
     inp_y, m = s2t(s, lm_vocab)
     inp_y = inp_y.cuda(gpu)
     res = []
+    print("inp_ys_tpl.size(0)", inp_ys_tpl.size(0), "s len", len(s), inp_y)
     for l in range(inp_ys_tpl.size(0)):
         probs, pred, incremental_state = lm_model.work_incremental(enc, src_padding_mask,
-                                                                   inp_y, inp_ys_tpl[0:l+1, :], inp_ys_seg[0:l +
-                                                                                                           1, :], inp_ys_pos[0:l+1, :],
+                                                                   inp_y,
+                                                                   inp_ys_tpl[0:l+1, :],
+                                                                   inp_ys_seg[0:l + 1, :],
+                                                                   inp_ys_pos[0:l+1, :],
                                                                    incremental_state)
         next_tk = []
         for i in range(len(s)):
@@ -66,9 +70,12 @@ def top_k_inc(enc, src_padding_mask, inp_ys_tpl, inp_ys_seg, inp_ys_pos, s):
                 logits = probs[len(s[i]) - 1, i]
             else:
                 logits = probs[0, i]
+            print(logits)
             ps, idx = torch.topk(logits, k=k)
             ps = ps / torch.sum(ps)
-            sampled = torch.multinomial(ps, num_samples=1)
+            sampled = torch.multinomial(
+                ps, num_samples=1)  # 根据权重张量, 按照数量, 抽取样例, 返回是下标?
+
             sampled_idx = idx[sampled]
             next_tk.append(lm_vocab.idx2token(sampled_idx.item()))
 
@@ -326,11 +333,11 @@ for i in range(5):
     idx = 0
     fo = open("./results/top-"+str(k)+"/out"+str(i+1)+".txt", "w")
     while idx < len(ds):
-        lb = ds[idx:idx + batch_size]
+        lb = ds[idx:idx + batch_size]  # 获得batch_size 个例子
         cplb = []
         for line in lb:
             cplb += [line for i in range(cp_size)]
-        print(cplb)
+        print("cplb", cplb)
         xs_tpl, xs_seg, xs_pos, \
             ys_truth, ys_inp, \
             ys_tpl, ys_seg, ys_pos, msk = new_s2xy(
@@ -344,13 +351,13 @@ for i in range(5):
         ys_pos = ys_pos.cuda(local_rank)
 
         enc, src_padding_mask = lm_model.encode(xs_tpl, xs_seg, xs_pos)
-        s = [['<bos>']] * batch_size * cp_size
+        s = [['<bos>']] * batch_size * cp_size  # 1*1*1, 赋值一个默认.
         res = top_k_inc(enc, src_padding_mask, ys_tpl, ys_seg, ys_pos, s)
 
         for i, line in enumerate(cplb):
             r = ''.join(res[i])
-            print(line)
-            print(r)
+            print("line", i, line)
+            print("r", r)
 
             fo.write(line + "\t" + r + "\n")
 

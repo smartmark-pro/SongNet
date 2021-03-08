@@ -9,6 +9,17 @@ import time
 from biglm import BIGLM
 from data import Vocab, DataLoader, s2t, s2xy_polish
 
+
+def init_seeds():
+    random.seed(123)
+    torch.manual_seed(123)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(123)
+
+
+init_seeds()
+
+
 gpu = 0
 def init_model(m_path, device, vocab):
     ckpt= torch.load(m_path, map_location='cpu')

@@ -164,7 +164,7 @@ def gen_parse_line(line, max_len, min_len, bound=300):
         # 从ss300开始可能是因为倒着的缘故
         # 但是这里用一个值表示, 会不会不能表示位置啊?
         xs_pos = [PS[bound+j] for j in range(
-            len(ws))] + [i] + [EOC] + [PS[bound+j] for _ in range(len(repeater))] + [EOC]
+            len(ws))] + [i] + [EOC] + [PS[bound+j] for j in range(len(repeater))] + [EOC]
 
         ys_tpl = []
         ys_seg = []
@@ -182,13 +182,13 @@ def gen_parse_line(line, max_len, min_len, bound=300):
 
                     if tpl_sents[si][k] == "_":
                         # 可变化的文字
-                        ys_tpl.append(CS[3])
+                        ys_tpl.append(CS[2])
                     else:
                         # 不可变的文字
-                        ys_tpl.append(CS[2])
+                        ys_tpl.append(w)
                 else:
                     # 标点符号
-                    ys_tpl.append(CS[1])
+                    ys_tpl.append(w)  # 改成一样的polish
             ys += ws + [RS]
             # 直接替换
             # if ws[-1] in PUNCS:
@@ -255,7 +255,7 @@ def parse_line(line, max_len, min_len):
             else:
                 ys_tpl.append(CS[1])
         ys += ws + [RS]
-        if ws[-1] in PUNCS:
+        if ws[-1] in PUNCS:  # 不变的是韵脚,
             ys_tpl[-2] = CS[3]
         else:
             ys_tpl[-1] = CS[3]
