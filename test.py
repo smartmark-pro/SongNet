@@ -38,7 +38,8 @@ def init_model(m_path, device, vocab):
     return lm_model, lm_vocab, lm_args
 
 
-m_path = ""  # "./model/songnet_songci/songci.ckpt"
+# "./model/songnet_songci/songci.ckpt"
+m_path = "/content/ckpt/epoch30_batch_18999"
 lm_model, lm_vocab, lm_args = init_model(m_path, gpu, "./data/vocab.txt")
 
 
@@ -350,16 +351,20 @@ for i in range(5):
         ys_seg = ys_seg.cuda(local_rank)
         ys_pos = ys_pos.cuda(local_rank)
 
-        enc, src_padding_mask = lm_model.encode(xs_tpl, xs_seg, xs_pos)
-        s = [['<bos>']] * batch_size * cp_size  # 1*1*1, 赋值一个默认.
-        res = top_k_inc(enc, src_padding_mask, ys_tpl, ys_seg, ys_pos, s)
+        try:
 
-        for i, line in enumerate(cplb):
-            r = ''.join(res[i])
-            print("line", i, line)
-            print("r", r)
+            enc, src_padding_mask = lm_model.encode(xs_tpl, xs_seg, xs_pos)
+            s = [['<bos>']] * batch_size * cp_size  # 1*1*1, 赋值一个默认.
+            res = top_k_inc(enc, src_padding_mask, ys_tpl, ys_seg, ys_pos, s)
 
-            fo.write(line + "\t" + r + "\n")
+            for i, line in enumerate(cplb):
+                r = ''.join(res[i])
+                print("line", i, line)
+                print("r", r)
+
+                fo.write(line + "\t" + r + "\n")
+        except Exception as e:
+            print(e)
 
         idx += batch_size
 
