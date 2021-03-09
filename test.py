@@ -51,7 +51,7 @@ def top_k_inc(enc, src_padding_mask, inp_ys_tpl, inp_ys_seg, inp_ys_pos, s):
     inp_y, m = s2t(s, lm_vocab)
     inp_y = inp_y.cuda(gpu)
     res = []
-    print("inp_ys_tpl.size(0)", inp_ys_tpl.size(0), "s len", len(s), inp_y)
+    print("inp_ys_tpl.size(0)", inp_ys_tpl.size(0), "s len", len(s))
     for l in range(inp_ys_tpl.size(0)):
         probs, pred, incremental_state = lm_model.work_incremental(enc, src_padding_mask,
                                                                    inp_y,
@@ -70,7 +70,7 @@ def top_k_inc(enc, src_padding_mask, inp_ys_tpl, inp_ys_seg, inp_ys_pos, s):
                 logits = probs[len(s[i]) - 1, i]
             else:
                 logits = probs[0, i]
-            print(logits)
+            # print(logits)
             ps, idx = torch.topk(logits, k=k)
             ps = ps / torch.sum(ps)
             sampled = torch.multinomial(
@@ -337,7 +337,7 @@ for i in range(5):
         cplb = []
         for line in lb:
             cplb += [line for i in range(cp_size)]
-        print("cplb", cplb)
+        print("cplb", idx, cplb)
         xs_tpl, xs_seg, xs_pos, \
             ys_truth, ys_inp, \
             ys_tpl, ys_seg, ys_pos, msk = new_s2xy(

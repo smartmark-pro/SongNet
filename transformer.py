@@ -154,7 +154,8 @@ class MultiheadAttention(nn.Module):
                 prev_key = saved_state['prev_key']
                 if bidx is not None:
                     prev_key = prev_key[bidx]
-                prev_key = prev_key.contiguous().view(bsz * self.num_heads, -1, self.head_dim)
+                prev_key = prev_key.contiguous().view(
+                    bsz * self.num_heads, -1, self.head_dim)  # view重整大小
                 k = torch.cat((prev_key, k), dim=1)
             if 'prev_value' in saved_state:
                 prev_value = saved_state['prev_value']
