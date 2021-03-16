@@ -302,7 +302,7 @@ test_data = get_data_by_category(test_obj, "test")
 
 def get_data_by_mount(data, name):
     # 类别, 数量, 取得是先混合后的
-    # 可以考虑按类别划分
+    # 每个类别都有
     print(len(data))
     save_data(name, data, "1_")
     return data
@@ -319,13 +319,14 @@ for k, v in new_category_data.items():
         new_dev_data.append(v[-2])
         new_test_data.append(v[-1])
     else:
-        new_train_data += v[: int(0.87*len(v))]
-        new_dev_data += v[int(0.87*len(v)):int(0.9*len(v))]
-        new_test_data += v[int(0.9*len(v)):]
+        new_train_data += v[:int(0.88*len(v))]
+        new_dev_data += v[int(0.88*len(v)):int(0.92*len(v))]
+        new_test_data += v[int(0.92*len(v)):]
 
+    # print(len(new_train_data), len(new_dev_data), len(new_test_data))
 new_train_data = get_data_by_mount(new_train_data, "train")
 new_dev_data = get_data_by_mount(new_dev_data, "dev")
-test_data = get_data_by_mount(test_data, "test")
+new_test_data = get_data_by_mount(new_test_data, "test")
 
 print("vocab")
 print(len(cnt))  # 5310 + 1024+9 + 64 = 6407 + 几个字.
