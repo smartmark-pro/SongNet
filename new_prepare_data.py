@@ -319,8 +319,8 @@ for k, v in new_category_data.items():
         new_dev_data.append(v[-2])
         new_test_data.append(v[-1])
     else:
-        new_train_data += v[:int(0.88*len(v))]
-        new_dev_data += v[int(0.88*len(v)):int(0.92*len(v))]
+        new_train_data += v[:int(0.92*len(v))-1]
+        new_dev_data += v[int(0.92*len(v))-1:int(0.92*len(v))]
         new_test_data += v[int(0.92*len(v)):]
 
     # print(len(new_train_data), len(new_dev_data), len(new_test_data))

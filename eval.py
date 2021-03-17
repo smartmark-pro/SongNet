@@ -39,7 +39,7 @@ with open("./data/r_dev.txt", "r") as f:
 print(len(ds))
 
 local_rank = gpu
-batch_size = 10
+batch_size = 4
 batches = round(len(ds) / batch_size)
 idx = 0
 
