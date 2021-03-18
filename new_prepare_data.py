@@ -1,12 +1,12 @@
-from hashlib import new
 import json
 import collections
 import sys
 import re
-from collections import Counter
 import random
 import pandas as pd
+from LAC import LAC
 from collections import Counter
+from hashlib import new
 cnt = Counter()
 random.seed(10)
 
@@ -92,7 +92,7 @@ for k, v in category_data.items():
             tokens[k] += len(gen[1])
             # print(type(gen), len(gen))
             a = re.findall("</s>", gen[1])
-            print(len(a))
+            # print(len(a))
             sentences[k] += len(a)
         print(k, len(v), end="\t")
     else:
@@ -328,9 +328,74 @@ new_train_data = get_data_by_mount(new_train_data, "train")
 new_dev_data = get_data_by_mount(new_dev_data, "dev")
 new_test_data = get_data_by_mount(new_test_data, "test")
 
-print("vocab")
-print(len(cnt))  # 5310 + 1024+9 + 64 = 6407 + 几个字.
-with open('./data/vocab.txt', 'w', encoding='utf8') as f:
-    for x, y in cnt.most_common():
-        f.write(x + '\t' + str(y) + '\n')
-print("done")
+
+def get_word_vocab():
+    # 带词性模式的结果会不会有其他特点呢?
+    # 模型设计上是否可以加一层词性呢?
+    lac = LAC(mode='seg')
+    word_count = collections.Counter()
+    texts = []
+
+    for k, v in category_data.items():
+        texts.append(k)
+        for t in v:
+            texts.append(t[0].split("<s1>")[0])
+            texts.append(t[1])
+    seg_results = lac.run(texts)
+    for items in seg_results:
+        for w in items:
+            word_count[w] += 1
+
+    print(len(word_count))
+    with open('./data/vocab2.txt', 'w', encoding='utf8') as f:
+        for x, y in word_count.most_common():
+            x = x.replace("\n", "").replace("\t", "")
+            f.write(x + '\t' + str(y) + '\n')
+    print("done")
+
+
+def get_word_and_pos_vocab():
+    # 带词性模式的结果会不会有其他特点呢?
+    # 模型设计上是否可以加一层词性呢?
+    lac = LAC(mode='lac')
+    word_count = collections.Counter()
+    texts = []
+    seg = "_"
+
+    for k, v in category_data.items():
+        texts.append(k)
+        for t in v:
+            texts.append(t[0].split("<s1>")[0])
+            texts.append(t[1])
+    seg_results = lac.run(texts)
+    for items in seg_results:
+        words, p = items
+        for i, w in enumerate(words):
+            word_count[w+seg+p[i]] += 1
+
+    print(len(word_count))
+    with open('./data/vocab3.txt', 'w', encoding='utf8') as f:
+        for x, y in word_count.most_common():
+            item = x.split(seg)
+            if len(item) != 2:
+                print(item)
+                continue
+            w, p = item
+            w = w.replace("\n", "").replace("\t", "")
+            f.write(w + '\t' + str(y) + '\t' + p + '\n')
+    print("done")
+
+
+def get_char_vocab(word_count):
+
+    print("vocab")
+    print(len(word_count))  # 5310 + 1024+9 + 64 = 6407 + 几个字.
+    with open('./data/vocab1.txt', 'w', encoding='utf8') as f:
+        for x, y in word_count.most_common():
+            x = x.replace("\n", "").replace("\t", "")
+            f.write(x + '\t' + str(y) + '\n')
+    print("done")
+
+
+# get_word_vocab
+# get_word_and_pos_vocab()
