@@ -8,7 +8,7 @@ import copy
 import time
 
 from biglm import BIGLM
-from data import Vocab, DataLoader, s2t, s2xy, new_s2xy
+from data import Vocab, DataLoader, s2t, s2xy, new_s2xy, new_word_s2xy
 
 gpu = 0  # int(sys.argv[2]) if len(sys.argv) > 1 else 0
 
@@ -51,7 +51,7 @@ while idx < len(ds):
     cplb = ds[idx:idx + batch_size]
     xs_tpl, xs_seg, xs_pos, \
         ys_truth, ys_inp, \
-        ys_tpl, ys_seg, ys_pos, msk = new_s2xy(
+        ys_tpl, ys_seg, ys_pos, msk = new_word_s2xy(
             cplb, lm_vocab, lm_args.max_len, 2)  # fix
 
     xs_tpl = xs_tpl.cuda(local_rank)

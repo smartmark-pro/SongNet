@@ -1,1 +1,1 @@
-python3 -u test.py
+python3 -u new_test.py

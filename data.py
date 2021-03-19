@@ -1,6 +1,7 @@
 import random
 import torch
 import numpy as np
+from LAC import LAC
 
 PAD, UNK, BOS, EOS = '<pad>', '<unk>', '<bos>', '<eos>'
 BOC, EOC = '<boc>', '<eoc>'
@@ -12,9 +13,17 @@ PS = ['<p-1>'] + ['<p-2>'] + \
     ['<p' + str(i) + '>' for i in range(512)]  # position
 TS = ['<t-1>'] + ['<t-2>'] + ['<t' + str(i) + '>' for i in range(32)]
 
+# 将词性引入到模板中, 相同的词跳过作为原样
+#
+pos_hub_name = ["n", "PER", "nr", "LOC", "ns", "ORG", "nt", "nw", "nz", "TIME", "t",
+                "f", "s", "v", "vd", "vn", "a", "ad", "an", "d", "m", "q", "p", "c", "r", "u", "xc", "w"]
+pos2CS_dict = {pos_hub_name[i]: CS[i+4] for i in range(len(pos_hub_name))}
+print(len(pos2CS_dict), pos2CS_dict)
+
 PUNCS = set([",", ".", "?", "!", ":", "，", "。", "？", "！", "："])
 
 BUFSIZE = 4096000
+lac = LAC(mode='lac')
 
 
 def ListsToTensor(xs, vocab=None):
@@ -104,6 +113,165 @@ def new_s2xy(lines, vocab, max_len, min_len):
 
     print(len(data), c1, c2)  # 记一下数字
     return batchify(data, vocab)
+
+
+def new_word_s2xy(lines, vocab, max_len, min_len):
+    data = []
+    c1, c2 = 0, 0
+    for line in lines:
+        res = word_gen_parse_line(line, max_len, min_len)
+        if not res:
+            continue
+        for p in res:
+            data.append(p)
+            c2 += 1
+        c1 += 1
+
+    print(len(data), c1, c2)  # 记一下数字
+    return batchify(data, vocab)
+
+
+def word_gen_parse_line(line, max_len, min_len, bound=300):
+    # 每个字符都返回list类型,
+    # 是不是应该模板改成带有词性的模板
+    # 不需要变得直接原文, <pos-xx>
+    # 明白了, 直接按照<\s> 分割, 然后再重新拼起来, 这样, 就能得到正确的结果了
+    # 把tpl也这样拼起来, 尽管这样有点搞笑
+    line, text = line.strip().split("\t")
+    # print(len(line), len(text), line, text)
+    if not line:
+        return []
+    fs = line.split("<s2>")
+    question, gen_name = fs[0].split("<s1>")
+    question_words = lac.run(question)[0]
+    gen_name_words = lac.run(gen_name)[0]
+
+    tpl = fs[1].strip()
+    # print(len(text), len(tpl))
+    # 模板需要重新合并, 妈呀, 之前是被切开的, 因为字的原因被重组的
+    text_list = text.split(RS)
+    text_results = lac.run(text_list)  # 这里有"</s>"分词之后怎么搞啊
+    words, poses = [], []
+    for word, pos in text_results:
+
+        words += word + [RS]
+        poses += pos + [RS]
+    count = len("".join(words))
+    # print(count, len(tpl))
+    # print(len(words), len(poses), len(text), len(text_list))
+    # print("".join(words))
+    # assert count == len(tpl)
+    # 为啥不等, 按理说应该完全一样啊
+
+    new_tpl = []
+    count = 0
+    # 纯文字就用w替代
+    for i, w in enumerate(words):
+        cur = tpl[count: count + len(w)]
+        if cur == w:
+            new_tpl.append(w)
+        else:
+            new_tpl.append(poses[i])
+        count += len(w)
+
+    assert len(new_tpl) == len(words)
+    # print(words, poses)
+    # assert len(tpl) == len(text)
+    # print(len(tpl), len(text))
+    #超过这部分的长度, 做分段
+    # 代码逻辑真的离谱, 不如直接分了
+    if len(words) < min_len:
+        return []
+    if len(words) <= max_len:
+        tpl_array = [(0, len(words))]
+    else:
+        # 分段必须要按句分, 不能有断开
+        # . 的数据处理错误
+        n = len(words)
+        last_punc = -1
+        cur = 0
+        tpl_array = []
+        for i in range(n):
+            if words[i] == RS:
+                last_punc = i
+            if i > 0 and i % max_len == 0:
+                # 可能会出错误, 最后会加一个eos
+                tpl_array.append((cur, last_punc))
+                cur = last_punc+1
+        if cur < n:
+            tpl_array.append((cur, n))
+    rs = []
+    # print(tpl_array)
+
+    def get_sents(arr):
+        ans = []
+        cur = []
+        for i in range(len(arr)):
+            if arr[i] != RS:
+                cur.append(arr[i])
+            else:
+                ans.append(cur)
+                cur = []
+        return ans
+
+    for i, (start, end) in enumerate(tpl_array):
+        tpl_sents = get_sents(new_tpl[start:end+1])
+        sents = get_sents(words[start:end+1])
+        # print(tpl_sents, sents) # 分句
+        ys = []
+        xs_tpl = []
+        xs_seg = []
+        xs_pos = []
+
+        # 需要增加问题, 类别, 拆分序号.
+        # 问题可能增加了一些信息但是也可能带来一些无意信息, 而且是变长的, 这里没法合理的放置
+        # idx = "<p-{}>".format(i)
+        ws = [w for w in gen_name_words]
+        repeater = [q for q in question_words]
+
+        xs_tpl = ws + [i] + [EOC] + repeater + [EOC]
+        xs_seg = [SS[0] for _ in ws] + [i] + [EOC] + [SS[1]
+                                                      for _ in repeater] + [EOC]
+        # 从ss300开始可能是因为倒着的缘故
+        # 但是这里用一个值表示, 会不会不能表示位置啊?
+        xs_pos = [PS[bound+j] for j in range(
+            len(ws))] + [i] + [EOC] + [PS[bound+j] for j in range(len(repeater))] + [EOC]
+
+        ys_tpl = []
+        ys_seg = []
+        ys_pos = []
+        # 按句编码
+        for si, sent in enumerate(sents):
+            ws = sent
+            for k, w in enumerate(sent):
+                # ws.append(w)
+                if tpl_sents[si][k] in pos2CS_dict:
+                    # print(si, k, sent)
+                    ys_tpl.append(pos2CS_dict[tpl_sents[si][k]])
+
+                else:
+                    # 标点符号, 不可变
+                    ys_tpl.append(w)  # 改成一样的polish
+            ys += sent + [RS]
+            ys_tpl += [RS]
+            ys_seg += [SS[si + 2] for w in ws] + [RS]
+            ys_pos += [PS[i + 2] for i in range(len(ws))] + [RS]
+            # 因为总是韵脚, 所以倒着来更好一些,但是梗仿写不需要
+        ys += [EOS]
+        ys_tpl += [EOS]
+        ys_seg += [EOS]
+        ys_pos += [EOS]
+
+        xs_tpl += ys_tpl
+        xs_seg += ys_seg
+        xs_pos += ys_pos
+
+        # print(ys)
+        if len(ys) < min_len:
+            return []
+
+        rs.append((xs_tpl, xs_seg, xs_pos, ys, ys_tpl, ys_seg, ys_pos))
+    return rs
 
 
 def gen_parse_line(line, max_len, min_len, bound=300):
@@ -369,7 +537,7 @@ class DataLoader(object):
             # if not res:
             #     continue
             # data.append(res)
-            res = gen_parse_line(line, self.max_len_y, self.min_len_y)
+            res = word_gen_parse_line(line, self.max_len_y, self.min_len_y)
             if not res:
                 continue
             for p in res:
@@ -454,14 +622,14 @@ if __name__ == "__main__":
     # ys_pos['<p7>', '<p6>', '<p5>', '<p4>', '<p3>', '<p2>', '<p1>', '<p0>', '</s>', '<p5>', '<p4>', '<p3>', '<p2>', '<p1>', '<p0>', '</s>', '<p7>', '<p6>', '<p5>', '<p4>', '<p3>', '<p2>', '<p1>', '<p0>', '</s>', '<p5>', '<p4>', '<p3>', '<p2>', '<p1>', '<p0>', '</s>',
     #        '<p7>', '<p6>', '<p5>', '<p4>', '<p3>', '<p2>', '<p1>', '<p0>', '</s>', '<p5>', '<p4>', '<p3>', '<p2>', '<p1>', '<p0>', '</s>', '<p7>', '<p6>', '<p5>', '<p4>', '<p3>', '<p2>', '<p1>', '<p0>', '</s>', '<p5>', '<p4>', '<p3>', '<p2>', '<p1>', '<p0>', '</s>', '<eos>']
 
-    lines = ["在慈溪中学李晓燕老师班里就读是什么体验？<s1>苏联笑话-6<s2>__举行盛大五一节游行，</s>__率_______全体出席，</s>检阅游行队伍。</s>就在游行队伍通过主席台的时候，</s>_``_同志突然发现人群中有一个人掏出一把___了_几天__的_，</s>于是他马上对身边的______：“我敢打赌，</s>这个_____的人里面没穿内裤！</s>”_____不以为然，</s>难道__同志真长了透视眼不成？</s>_马上命令警卫把那个人叫道跟前，</s>亲自询问，</s>吃惊地发现，</s>这人长裤里面果然是光着的。</s>_______地问领袖：“__同志，</s>您是如何知道透过外衣看见他没穿内裤的？</s>”__回答：“我看见他掏出了新__，</s>他的___显然没用来买内裤嘛。</s>”众人大惊，</s>无不佩服领袖超凡的洞察力……	慈中举行盛大五一节游行，</s>校长率各年级优秀教师全体出席，</s>检阅游行队伍。</s>就在游行队伍通过主席台的时候，</s>校长同志突然发现人群中有一个人掏出一把梳子梳了梳几天没洗的头，</s>于是他马上对身边的miss李道：“我敢打赌，</s>这个拿梳子梳头的人里面没穿内裤！</s>”miss李不以为然，</s>难道校长同志真长了透视眼不成？</s>她马上命令警卫把那个人叫道跟前，</s>亲自询问，</s>吃惊地发现，</s>这人长裤里面果然是光着的。</s>miss李敬佩地问领袖：“校长同志，</s>您是如何知道透过外衣看见他没穿内裤的？</s>”校长回答：“我看见他掏出了新梳子，</s>他的零花钱显然没用来买内裤嘛。</s>”众人大惊，</s>无不佩服领袖超凡的洞察力……",
+    lines = ["""在慈溪中学李晓燕老师班里就读是什么体验？<s1>苏联笑话-6<s2>__举行盛大五一节游行，</s>__率_______全体出席，</s>检阅游行队伍。</s>就在游行队伍通过主席台的时候，</s>_``_同志突然发现人群中有一个人掏出一把___了_几天__的_，</s>于是他马上对身边的______：“我敢打赌，</s>这个_____的人里面没穿内裤！</s>”_____不以为然，</s>难道__同志真长了透视眼不成？</s>_马上命令警卫把那个人叫道跟前，</s>亲自询问，</s>吃惊地发现，</s>这人长裤里面果然是光着的。</s>_______地问领袖：“__同志，</s>您是如何知道透过外衣看见他没穿内裤的？</s>”__回答：“我看见他掏出了新__，</s>他的___显然没用来买内裤嘛。</s>”众人大惊，</s>无不佩服领袖超凡的洞察力……	慈中举行盛大五一节游行，</s>校长率各年级优秀教师全体出席，</s>检阅游行队伍。</s>就在游行队伍通过主席台的时候，</s>校长同志突然发现人群中有一个人掏出一把梳子梳了梳几天没洗的头，</s>于是他马上对身边的miss李道：“我敢打赌，</s>这个拿梳子梳头的人里面没穿内裤！</s>”miss李不以为然，</s>难道校长同志真长了透视眼不成？</s>她马上命令警卫把那个人叫道跟前，</s>亲自询问，</s>吃惊地发现，</s>这人长裤里面果然是光着的。</s>miss李敬佩地问领袖：“校长同志，</s>您是如何知道透过外衣看见他没穿内裤的？</s>”校长回答：“我看见他掏出了新梳子，</s>他的零花钱显然没用来买内裤嘛。</s>”众人大惊，</s>无不佩服领袖超凡的洞察力……""",
              """当英国首相进入ICU的时候<s1>让子弹飞, 惊喜<s2>你给翻译翻译，</s>什么叫____？</s>__</s>___：__________________ 。</s>___：翻译翻译__</s>____难道你听不懂_______？</s> 。</s>___：你_翻译翻译，</s>___________</s>___翻译给我听，</s>什么___叫________</s>！</s>__</s>___：____就是，</s>________，</s>_____________，</s>______的______</s>_____</s>_______________了 。</s>___：翻译翻译！</s>_</s>_</s>___：____就是，</s>_________，</s>___________，</s>____________</s>____</s>______________的___</s>_________</s>______</s>_______！</s>！</s>_</s>________，</s>_______</s>_______</s>_____的	你给翻译翻译，</s>什么叫群体免疫？</s> 。</s>约翰逊：大家一起感染病毒产生抗体获得免疫力啊 。</s>中国人：翻译翻译 。</s>约翰逊：难道你听不懂什么是感染病毒？</s> 。</s>中国人：你给翻译翻译，</s>什么TMD叫群体免疫？</s>我让你翻译给我听，</s>什么TMD叫TMD群体免疫？</s>！</s> 。</s>约翰逊：群体免疫就是，</s>我们不怕感染病毒，</s>感染了在家休息几天就能好了，</s>以后什么变异的新冠都不怕，</s>省钱省事，</s>国家多建设几个太平间火葬场就行了 。</s>中国人：翻译翻译！</s>！</s>！</s>约翰逊：群体免疫就是，</s>我们全国在岛上养蛊，</s>隔着屏幕看你们手忙脚乱，</s>顺便杠一下你们限制自由，</s>不皿煮，</s>等我们大嘤帝国人人都有免疫力的时候，</s>放出去全世界乱串，</s>把你们毒死，</s>重新大航海辉煌！</s>！</s>！</s>要是没把你们毒死，</s>我们只要死人，</s>反正甩锅你们，</s>你们先爆发的"""]
     # 模板(原题+012), 分句标记, 倒叙句内标记, 无标题原句单字(结果y), 模板(无标题+012), 分句标记(无标题), 倒叙句内标记(无标记)
     # 感觉不知道怎么对抗这种分割后有一定偏移的情形
     #
     for line in lines:
         print("line", line)
-        rs = gen_parse_line(line, 300, 2)
+        rs = word_gen_parse_line(line, 300, 2)
         print(len(rs))
         for i in range(len(rs)):
             for j in range(len(rs[i])):
