@@ -14,7 +14,7 @@ python3 -u train.py --embed_dim 768 \
                       --weight_decay 0 \
                       --smoothing 0.1 \
                       --max_len 300 \
-                      --min_len 10 \
+                      --min_len 2 \
                       --world_size 1 \
                       --gpus 1 \
                       --start_rank 0 \
