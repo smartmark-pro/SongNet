@@ -361,6 +361,7 @@ def get_word_vocab():
             x = remove_space(x)
             f.write(x + '\t' + str(y) + '\n')
     print("done")
+    return word_count
 
 
 def get_word_and_pos_vocab():
@@ -397,18 +398,31 @@ def get_word_and_pos_vocab():
             w = remove_space(w)
             f.write(w + '\t' + str(y) + '\t' + p + '\n')
     print("done")
+    return word_count
 
 
-def get_char_vocab(word_count):
+def get_char_vocab(word_count, name='./data/vocab1.txt'):
 
     print("vocab")
     print(len(word_count))  # 5310 + 1024+9 + 64 = 6407 + 几个字.
-    with open('./data/vocab1.txt', 'w', encoding='utf8') as f:
+    with open(name, 'w', encoding='utf8') as f:
         for x, y in word_count.most_common():
             x = x.replace("\n", "").replace("\t", "")
             f.write(x + '\t' + str(y) + '\n')
     print("done")
 
 
-get_word_vocab()
-# get_word_and_pos_vocab()
+wc1 = get_word_vocab()
+wc2 = get_word_and_pos_vocab()
+# 合并
+for k, v in wc2.items():
+    wc1[k.split("_")[0]] += v
+
+with open("./data/some_common_vocab.txt") as f:
+    for line in f:
+        rs = line.strip().split("\t")
+        if len(rs) == 2:
+            w, c = rs
+            wc1[w] += int(c)//1000
+
+get_char_vocab(wc1, name="./data/vocab_compat.txt")

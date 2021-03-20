@@ -140,7 +140,7 @@ def word_gen_parse_line(line, max_len, min_len, bound=300):
     line, text = line.strip().split("\t")
     # print(len(line), len(text), line, text)
     if not line:
-        return []
+        return [None]
     fs = line.split("<s2>")
     question, gen_name = fs[0].split("<s1>")
     question_words = lac.run(question)[0]
@@ -181,7 +181,7 @@ def word_gen_parse_line(line, max_len, min_len, bound=300):
     #超过这部分的长度, 做分段
     # 代码逻辑真的离谱, 不如直接分了
     if len(words) < min_len:
-        return []
+        return [None]
     if len(words) <= max_len:
         tpl_array = [(0, len(words))]
     else:
@@ -268,7 +268,7 @@ def word_gen_parse_line(line, max_len, min_len, bound=300):
 
         # print(ys)
         if len(ys) < min_len:
-            return []
+            return [None]
 
         rs.append((xs_tpl, xs_seg, xs_pos, ys, ys_tpl, ys_seg, ys_pos))
     return rs
@@ -278,7 +278,7 @@ def gen_parse_line(line, max_len, min_len, bound=300):
     line, text = line.strip().split("\t")
     # print(len(line), len(text), line, text)
     if not line:
-        return []
+        return [None]
     fs = line.split("<s2>")
     question, gen_name = fs[0].split("<s1>")
     tpl = fs[1].strip()
@@ -286,7 +286,7 @@ def gen_parse_line(line, max_len, min_len, bound=300):
     # print(len(tpl), len(text))
     #超过这部分的长度, 做分段
     if len(tpl) < min_len:
-        return []
+        return [None]
     if len(tpl) <= max_len:
         tpl_array = [(0, len(tpl))]
     else:
@@ -378,7 +378,7 @@ def gen_parse_line(line, max_len, min_len, bound=300):
 
         # print(ys)
         if len(ys) < min_len:
-            return []
+            return [None]
 
         rs.append((xs_tpl, xs_seg, xs_pos, ys, ys_tpl, ys_seg, ys_pos))
     return rs

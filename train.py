@@ -79,7 +79,7 @@ def eval_epoch(lm_args, model, lm_vocab, local_rank, label):
             if line:
                 ds.append(line)
 
-    batch_size = 10
+    batch_size = 1
     batches = round(len(ds) / batch_size)
     idx = 0
     avg_nll = 0.
