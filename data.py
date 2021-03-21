@@ -74,6 +74,9 @@ def batchify(data, vocab):
     ys_pos = torch.LongTensor(ListsToTensor(ys_pos, vocab)).t_().contiguous()
     msk = torch.FloatTensor(ListsToTensor(
         msk)).t_().contiguous()  # 一维数组, 存储连续性, msk纯1?
+    # for i in (xs_tpl, xs_seg, xs_pos, ys_truth, ys_inp, ys_tpl, ys_seg, ys_pos, msk):
+    #     print(i.shape, end="\t")
+    # print()
     return xs_tpl, xs_seg, xs_pos, ys_truth, ys_inp, ys_tpl, ys_seg, ys_pos, msk
 
 
@@ -202,7 +205,7 @@ def word_gen_parse_line(line, max_len, min_len, bound=300):
         if cur < n:
             tpl_array.append((cur, n))
     rs = []
-    print(tpl_array)
+    # print([b-a+1 for a, b in tpl_array])
 
     def get_sents(arr):
         ans = []
