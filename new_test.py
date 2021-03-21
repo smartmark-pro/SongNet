@@ -342,33 +342,32 @@ for i in range(5):
         for line in lb:
             cplb += [line for i in range(cp_size)]
         print("cplb", idx, cplb)
-        for xs_tpl, xs_seg, xs_pos, \
+        xs_tpl, xs_seg, xs_pos, \
             ys_truth, ys_inp, \
-            ys_tpl, ys_seg, ys_pos, msk in new_word_s2xy(
-                cplb, lm_vocab, lm_args.max_len, 2):
+            ys_tpl, ys_seg, ys_pos, msk = new_word_s2xy(
+                cplb, lm_vocab, lm_args.max_len, 2)
 
-            xs_tpl = xs_tpl.cuda(local_rank)
-            xs_seg = xs_seg.cuda(local_rank)
-            xs_pos = xs_pos.cuda(local_rank)
-            ys_tpl = ys_tpl.cuda(local_rank)
-            ys_seg = ys_seg.cuda(local_rank)
-            ys_pos = ys_pos.cuda(local_rank)
+        xs_tpl = xs_tpl.cuda(local_rank)
+        xs_seg = xs_seg.cuda(local_rank)
+        xs_pos = xs_pos.cuda(local_rank)
+        ys_tpl = ys_tpl.cuda(local_rank)
+        ys_seg = ys_seg.cuda(local_rank)
+        ys_pos = ys_pos.cuda(local_rank)
 
-            try:
+        try:
 
-                enc, src_padding_mask = lm_model.encode(xs_tpl, xs_seg, xs_pos)
-                s = [['<bos>']] * batch_size * cp_size  # 1*1*1, 赋值一个默认.
-                res = top_k_inc(enc, src_padding_mask,
-                                ys_tpl, ys_seg, ys_pos, s)
+            enc, src_padding_mask = lm_model.encode(xs_tpl, xs_seg, xs_pos)
+            s = [['<bos>']] * batch_size * cp_size  # 1*1*1, 赋值一个默认.
+            res = top_k_inc(enc, src_padding_mask, ys_tpl, ys_seg, ys_pos, s)
 
-                for i, line in enumerate(cplb):
-                    r = ''.join(res[i])
-                    print("line", i, line)
-                    print("r", r)
+            for i, line in enumerate(cplb):
+                r = ''.join(res[i])
+                print("line", i, line)
+                print("r", r)
 
-                    fo.write(line + "\t" + r + "\n")
-            except Exception as e:
-                print(e)
+                fo.write(line + "\t" + r + "\n")
+        except Exception as e:
+            print(e)
 
         idx += batch_size
 
