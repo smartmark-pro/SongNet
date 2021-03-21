@@ -339,10 +339,6 @@ for i in range(5):
         for line in lb:
             cplb += [line for i in range(cp_size)]
         print("cplb", idx, cplb)
-        xs_tpl, xs_seg, xs_pos, \
-            ys_truth, ys_inp, \
-            ys_tpl, ys_seg, ys_pos, msk = new_s2xy(
-                cplb, lm_vocab, lm_args.max_len, 2)
 
         xs_tpl = xs_tpl.cuda(local_rank)
         xs_seg = xs_seg.cuda(local_rank)
@@ -351,18 +347,33 @@ for i in range(5):
         ys_seg = ys_seg.cuda(local_rank)
         ys_pos = ys_pos.cuda(local_rank)
 
+        def get_j_line(x, j):
+            return x[:, j].view(x.shape[0], 1)
+        res = []
         try:
+            for j in range(xs_tpl.shape[1]):
 
-            enc, src_padding_mask = lm_model.encode(xs_tpl, xs_seg, xs_pos)
-            s = [['<bos>']] * batch_size * cp_size  # 1*1*1, 赋值一个默认.
-            res = top_k_inc(enc, src_padding_mask, ys_tpl, ys_seg, ys_pos, s)
+                enc, src_padding_mask = lm_model.encode(get_j_line(
+                    xs_tpl, j), get_j_line(xs_seg, j), get_j_line(xs_pos, j))
+                s = [['<bos>']] * batch_size * cp_size  # 1*1*1, 赋值一个默认.
+                res_j = top_k_inc(enc, src_padding_mask, get_j_line(
+                    ys_tpl, j), get_j_line(ys_seg, j), get_j_line(ys_pos, j), s)
+                res.append(res_j[0])
 
-            for i, line in enumerate(cplb):
-                r = ''.join(res[i])
-                print("line", i, line)
-                print("r", r)
+            # print(res)
+            line = ""
+            for j, res_j in enumerate(res):
 
-                fo.write(line + "\t" + r + "\n")
+                if j == 0:
+                    r = ''.join(res_j[:-1])
+                    print("r", r)
+                    line += r[:-1]
+                else:
+                    r = ''.join(res_j[1:-1])
+                    print(r)
+                    line += r
+
+            fo.write(cplb[0] + "\t" + line + "</s>\n")
         except Exception as e:
             print(e)
 
