@@ -52,7 +52,7 @@ def top_k_inc(enc, src_padding_mask, inp_ys_tpl, inp_ys_seg, inp_ys_pos, s):
     inp_y, m = s2t(s, lm_vocab)
     inp_y = inp_y.cuda(gpu)
     res = []
-    print("inp_ys_tpl.size(0)", inp_ys_tpl.size(0), "s len", len(s))
+    # print("inp_ys_tpl.size(0)", inp_ys_tpl.size(0), "s len", len(s))
     for l in range(inp_ys_tpl.size(0)):
         probs, pred, incremental_state = lm_model.work_incremental(enc, src_padding_mask,
                                                                    inp_y,
@@ -99,7 +99,7 @@ def top_k_inc(enc, src_padding_mask, inp_ys_tpl, inp_ys_seg, inp_ys_pos, s):
 
     # for i in res:
     #    print(''.join(i))
-    print(time.time()-start)
+    # print(time.time()-start)
     return res
 
 
@@ -339,7 +339,10 @@ for i in range(5):
         for line in lb:
             cplb += [line for i in range(cp_size)]
         print("cplb", idx, cplb)
-
+        xs_tpl, xs_seg, xs_pos, \
+            ys_truth, ys_inp, \
+            ys_tpl, ys_seg, ys_pos, msk = new_s2xy(
+                cplb, lm_vocab, lm_args.max_len, 2)
         xs_tpl = xs_tpl.cuda(local_rank)
         xs_seg = xs_seg.cuda(local_rank)
         xs_pos = xs_pos.cuda(local_rank)
