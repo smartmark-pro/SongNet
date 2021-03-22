@@ -47,6 +47,7 @@ def parse_config():
     parser.add_argument('--MASTER_PORT', type=str)
     parser.add_argument('--start_rank', type=int)
     parser.add_argument('--backend', type=str)
+    parser.add_argument('--eval_batch_size', type=str)
 
     return parser.parse_args()
 
@@ -79,7 +80,7 @@ def eval_epoch(lm_args, model, lm_vocab, local_rank, label):
             if line:
                 ds.append(line)
 
-    batch_size = 10
+    batch_size = lm_args.eval_batch_size
     batches = round(len(ds) / batch_size)
     idx = 0
     avg_nll = 0.

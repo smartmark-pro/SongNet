@@ -7,10 +7,10 @@ BOC, EOC = '<boc>', '<eoc>'
 LS, RS, SP = '<s>', '</s>', ' '
 CS = ['<c-1>'] + ['<c' + str(i) + '>' for i in range(32)]  # content
 SS = ['<s-1>'] + ['<s-2>'] + \
-    ['<s' + str(i) + '>' for i in range(512)]  # segnment
+    ['<s' + str(i) + '>' for i in range(511)]  # segnment
 PS = ['<p-1>'] + ['<p-2>'] + \
-    ['<p' + str(i) + '>' for i in range(512)]  # position
-TS = ['<t-1>'] + ['<t-2>'] + ['<t' + str(i) + '>' for i in range(32)]
+    ['<p' + str(i) + '>' for i in range(511)]  # position
+TS = ['<t-1>'] + ['<t-2>'] + ['<t' + str(i) + '>' for i in range(31)]
 
 PUNCS = set([",", ".", "?", "!", ":", "，", "。", "？", "！", "："])
 
@@ -102,7 +102,7 @@ def new_s2xy(lines, vocab, max_len, min_len):
             c2 += 1
         c1 += 1
 
-    print(len(data), c1, c2)  # 记一下数字
+    # print(len(data), c1, c2)  # 记一下数字
     return batchify(data, vocab)
 
 
