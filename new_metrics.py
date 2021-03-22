@@ -1,41 +1,22 @@
 import os
 import sys
 import numpy as np
-from pypinyin import Style, lazy_pinyin
+# from pypinyin import Style, lazy_pinyin
+from LAC import LAC
+from data import PUNCS
 
-from data import PUNCS,
+pos_hub_name = ["n", "PER", "nr", "LOC", "ns", "ORG", "nt", "nw", "nz", "TIME", "t",
+                "f", "s", "v", "vd", "vn", "a", "ad", "an", "d", "m", "q", "p", "c", "r", "u", "xc", "w"]
 
-# 这个测试有点意思啊, 其实就是看压不压韵啊
-# 所以这里就对原词汇重新做分词, 看词性对不对
-# 但是类比怎么解决呢
-# 输入应该改成list形式否则, 可能不是很能解决另种实验方法啊
-# 还有测试
+lac = LAC(mode="lac")
 
-
-yunjiaos = {
-    "0": ["a", "ia", "ua", "va", "üa"],
-    "1": ["e", "o", "uo", "ie", "ue", "üe", "ve"],
-    "2": ["u"],
-    "3": ["i", "ü", "v"],
-    "4": ["ai", "uai"],
-    "5": ["ao", "iao"],
-    "6": ["ou", "iu", "iou"],
-    "7": ["an", "ian", "uan", "üan", "van"],
-    "8": ["en", "in", "un", "ün", "vn"],
-    "9": ["ang", "iang", "uang"],
-    "10": ["eng", "ing", "ueng", "ong", "iong"],
-    "11": ["er"],
-    "12": ["ei", "ui", "uei", "vei"],
-}
-
-yun2id = {}
-for yid, yws in yunjiaos.items():
-    for w in yws:
-        yun2id[w] = yid
+# 标准类别, 对应回答结果
+# 自定义类别形式呢
 
 
 def eval_tpl(sents1, sents2):
     n = 0.
+    # 需要改成myers后的结果, 把对位的先比掉
     if len(sents1) > len(sents2):
         sents1 = sents1[:len(sents2)]
     for i, x in enumerate(sents1):
@@ -51,9 +32,6 @@ def eval_tpl(sents1, sents2):
                 py.append(w)
         if px == py:
             n += 1
-    # 评估句子和长度数量是否一致,
-    # f是那个经典的调和平均值
-    # 这个可以复用
     p = n / len(sents2)
     r = n / len(sents1)
     f = 2 * p * r / (p + r + 1e-16)
@@ -61,66 +39,59 @@ def eval_tpl(sents1, sents2):
     return p, r, f, n, len(sents1), len(sents2)
 
 
-def rhythm_labellig(sents):
-    # 这块直接改成, 看词性的
-    rhys = []
-    # 具体的韵脚拼音
-    for sent in sents:
-        w = sent[-1]
-        if w in PUNCS and len(sent) > 1:
-            w = sent[-2]
-        yunmu = lazy_pinyin(w, style=Style.FINALS)
-        rhys.append(yunmu[0])
-
-    assert len(rhys) == len(sents)
-    rhy_map = {}
-    # 对应的数量
-    for i, r in enumerate(rhys):
-        if r in yun2id:
-            rid = yun2id[r]
-            if rid in rhy_map:
-                rhy_map[rid] += [i]
-            else:
-                rhy_map[rid] = [i]
-        else:
-            pass
-    max_len_yuns = -1
-    max_rid = ""
-    for rid, yuns in rhy_map.items():
-        if len(yuns) > max_len_yuns:
-            max_len_yuns = len(yuns)
-            max_rid = rid
-    res = []
-    # 取数量最高的量的id
-    # 这个是英文的么? 为什么会取1, -1, 是为了解决多种类型的曲子不同, 不好整理么
-    # 还是字的发音有变化, 所以会用这种方式?
-    for i in range(len(sents)):
-        if max_rid in rhy_map and i in rhy_map[max_rid]:
-            res.append(1)
-        else:
-            res.append(-1)
-    return res
+def get_lac_result(sents):
+    return lac.run(sents)
 
 
-def eval_rhythm(sents1, sents2):
+def eval_analogy(sents1, sents2, tpl_sents):
+    # 完美情形, 应该是字完全相同,
+    # 就算不相同, 也应该是词性相同, 但是我完全想不明白这里为什么不行
+    # 准确率（accuracy）： (TP + TN)/(TP + FP + TN + FN)
+    # 精准率（precision）：TP / (TP + FP)，正确预测为正占全部预测为正的比例
+    # 召回率（recall）： TP / (TP + FN)，正确预测为正占全部正样本的比例
+    # 暂时不确定, 这块的准确召回是否正确
     n = 0.
     if len(sents1) > len(sents2):
         sents1 = sents1[:len(sents2)]
-    rhys1 = rhythm_labellig(sents1)
-    rhys2 = rhythm_labellig(sents2)
+    lac_result1 = get_lac_result(sents1)
+    lac_result2 = get_lac_result(sents2)
 
+    # words1, poses1
+    # words2, poses2
     n1, n2 = 0., 0.
-    for v in rhys1:
-        if v == 1:
-            n1 += 1
-    for v in rhys2:
-        if v == 1:
-            n2 += 1
-    for i, v1 in enumerate(rhys1):
-        v2 = rhys2[i]
-        if v1 == 1 and v1 == v2:
-            n += 1
-    # 和主韵一致的, 完全一致的
+    for i in range(len(sents1)):
+        words1, poses1 = lac_result1[i]
+        words2, poses2 = lac_result2[i]
+        left = 0
+        other1, other2 = 0, 0
+        total1, total2 = 0, 0
+        for j in range(len(words1)):
+            add = len(words1[j])
+            # 补充的位置和词性是对的
+            if tpl_sents[i][left:left+add] == "_"*add:
+                if j < len(words2) and poses1[j] == poses2[j]:
+                    n += 1
+            else:
+                other1 += 1
+            left += add
+        total1 = len(words1)
+        # 我也不知道该咋算了, 直接随便整一个吧
+        for j in range(len(words2)):
+            add = len(words2[j])
+            # 补充的位置和词性是对的
+            if tpl_sents[i][left:left+add] == "_"*add:
+                if j < len(words1) and poses1[j] == poses2[j]:
+                    n += 1
+            else:
+                other2 += 1
+            left += add
+        total2 = len(words2)
+        # 为空的词数量
+        # 对应的槽位都是正确的话, 就没办法起到检测的作用了
+
+        n1 += total1 - other1
+        n2 += total2 - other2
+    # print(n1, n2, n)
     p = n / (n2 + 1e-16)
     r = n / (n1 + 1e-16)
     f1 = 2 * p * r / (p + r + 1e-16)
@@ -129,7 +100,6 @@ def eval_rhythm(sents1, sents2):
 
 def eval_endings(sents1, sents2):
     n = 0.
-    # 感觉这个操作是给gpt2搞得, 证明方法有效.
     if len(sents1) > len(sents2):
         sents1 = sents1[:len(sents2)]
 
@@ -153,13 +123,13 @@ def eval(res_file, fid):
             if not line:
                 continue
             fs = line.split("\t")
-            if len(fs) != 2:
-                print("error", line)
+            if len(fs) != 3:
+                print("error", len(fs), line[:10])
                 continue
-            x, y = fs
-            docs.append((x, y))
+            x, y, z = fs
+            docs.append((x, y, z))
 
-    print(len(docs))
+    print(len(docs), res_file, fid)
 
     ugrams_ = []
     bigrams_ = []
@@ -171,9 +141,9 @@ def eval(res_file, fid):
     d1_, d2_ = 0., 0.
     d4ends = []
 
-    for x, y in docs:
-        topic, content = x.split("<s2>")
-        author, topic = topic.split("<s1>")
+    for x, content, y in docs:
+        topic, tpl = x.split("<s2>")
+        new_topic, topic = topic.split("<s1>")
         sents1 = content.split("</s>")
         y = y.replace("<bos>", "")
         sents2 = y.split("</s>")
@@ -189,7 +159,8 @@ def eval(res_file, fid):
             if sent:
                 sents2_.append(sent)
         sents2 = sents2_
-
+        tpl_sents = tpl.split("</s>")
+        # 这个似乎没啥问题, 但是好像评价的时候应该用模板啊, 直接用content, 也行吧
         p, r, f1, n0, n1, n2 = eval_tpl(sents1, sents2)
         p_ += p
         r_ += r
@@ -198,6 +169,7 @@ def eval(res_file, fid):
         n1_ += n1
         n2_ += n2
 
+        # 结构相关贡献值? 就是应该在一个范围吧, 不能太高的
         ugrams = [w for w in ''.join(sents2)]
         bigrams = []
         for bi in range(len(ugrams) - 1):
@@ -207,7 +179,7 @@ def eval(res_file, fid):
         ugrams_ += ugrams
         bigrams_ += bigrams
 
-        p, r, f1, n0, n1, n2 = eval_rhythm(sents1, sents2)
+        p, r, f1, n0, n1, n2 = eval_analogy(sents1, sents2, tpl_sents)
         p__ += p
         r__ += r
         f1__ += f1
@@ -216,7 +188,7 @@ def eval(res_file, fid):
         n2__ += n2
 
         d4end = eval_endings(sents1, sents2)
-        d4ends.append(author + "<s1>" + topic + "<s2>" + d4end)
+        d4ends.append(new_topic + "<s1>" + topic + "<s2>" + d4end)
 
     tpl_macro_p = p_ / len(docs)
     tpl_macro_r = r_ / len(docs)

@@ -2,16 +2,36 @@ import os
 import sys
 import numpy as np
 from pypinyin import Style, lazy_pinyin
-from LAC import LAC
+
 from data import PUNCS
 
-pos_hub_name = ["n", "PER", "nr", "LOC", "ns", "ORG", "nt", "nw", "nz", "TIME", "t",
-                "f", "s", "v", "vd", "vn", "a", "ad", "an", "d", "m", "q", "p", "c", "r", "u", "xc", "w"]
+# 这个测试有点意思啊, 其实就是看压不压韵啊
+# 所以这里就对原词汇重新做分词, 看词性对不对
+# 但是类比怎么解决呢
+# 输入应该改成list形式否则, 可能不是很能解决另种实验方法啊
+# 还有测试
 
-lac = LAC(mode="lac")
 
-# 标准类别, 对应回答结果
-# 自定义类别形式呢
+yunjiaos = {
+    "0": ["a", "ia", "ua", "va", "üa"],
+    "1": ["e", "o", "uo", "ie", "ue", "üe", "ve"],
+    "2": ["u"],
+    "3": ["i", "ü", "v"],
+    "4": ["ai", "uai"],
+    "5": ["ao", "iao"],
+    "6": ["ou", "iu", "iou"],
+    "7": ["an", "ian", "uan", "üan", "van"],
+    "8": ["en", "in", "un", "ün", "vn"],
+    "9": ["ang", "iang", "uang"],
+    "10": ["eng", "ing", "ueng", "ong", "iong"],
+    "11": ["er"],
+    "12": ["ei", "ui", "uei", "vei"],
+}
+
+yun2id = {}
+for yid, yws in yunjiaos.items():
+    for w in yws:
+        yun2id[w] = yid
 
 
 def eval_tpl(sents1, sents2):
@@ -31,6 +51,9 @@ def eval_tpl(sents1, sents2):
                 py.append(w)
         if px == py:
             n += 1
+    # 评估句子和长度数量是否一致,
+    # f是那个经典的调和平均值
+    # 这个可以复用
     p = n / len(sents2)
     r = n / len(sents1)
     f = 2 * p * r / (p + r + 1e-16)
@@ -38,17 +61,53 @@ def eval_tpl(sents1, sents2):
     return p, r, f, n, len(sents1), len(sents2)
 
 
-def get_lac_result(sents):
-    words, poses = lac.run(sents)
-    return words, poses
+def rhythm_labellig(sents):
+    # 这块直接改成, 看词性的
+    rhys = []
+    # 具体的韵脚拼音
+    for sent in sents:
+        w = sent[-1]
+        if w in PUNCS and len(sent) > 1:
+            w = sent[-2]
+        yunmu = lazy_pinyin(w, style=Style.FINALS)
+        rhys.append(yunmu[0])
+
+    assert len(rhys) == len(sents)
+    rhy_map = {}
+    # 对应的数量
+    for i, r in enumerate(rhys):
+        if r in yun2id:
+            rid = yun2id[r]
+            if rid in rhy_map:
+                rhy_map[rid] += [i]
+            else:
+                rhy_map[rid] = [i]
+        else:
+            pass
+    max_len_yuns = -1
+    max_rid = ""
+    for rid, yuns in rhy_map.items():
+        if len(yuns) > max_len_yuns:
+            max_len_yuns = len(yuns)
+            max_rid = rid
+    res = []
+    # 取数量最高的量的id
+    # 这个是英文的么? 为什么会取1, -1, 是为了解决多种类型的曲子不同, 不好整理么
+    # 还是字的发音有变化, 所以会用这种方式?
+    for i in range(len(sents)):
+        if max_rid in rhy_map and i in rhy_map[max_rid]:
+            res.append(1)
+        else:
+            res.append(-1)
+    return res
 
 
 def eval_rhythm(sents1, sents2):
     n = 0.
     if len(sents1) > len(sents2):
         sents1 = sents1[:len(sents2)]
-    rhys1 = get_lac_result(sents1)
-    rhys2 = get_lac_result(sents2)
+    rhys1 = rhythm_labellig(sents1)
+    rhys2 = rhythm_labellig(sents2)
 
     n1, n2 = 0., 0.
     for v in rhys1:
@@ -61,6 +120,7 @@ def eval_rhythm(sents1, sents2):
         v2 = rhys2[i]
         if v1 == 1 and v1 == v2:
             n += 1
+    # 和主韵一致的, 完全一致的
     p = n / (n2 + 1e-16)
     r = n / (n1 + 1e-16)
     f1 = 2 * p * r / (p + r + 1e-16)
@@ -69,6 +129,7 @@ def eval_rhythm(sents1, sents2):
 
 def eval_endings(sents1, sents2):
     n = 0.
+    # 感觉这个操作是给gpt2搞得, 证明方法有效.
     if len(sents1) > len(sents2):
         sents1 = sents1[:len(sents2)]
 
