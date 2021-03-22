@@ -139,7 +139,7 @@ def run(args, local_rank):
     acc_acm, nll_acm, ppl_acm, ntokens_acm, nxs, npairs_acm, loss_acm = 0., 0., 0., 0., 0., 0., 0.
     while True:
         model.train()
-        if train_data.epoch_id > 30:
+        if train_data.epoch_id > args.max_epoch:
             break
         for xs_tpl, xs_seg, xs_pos, ys_truth, ys_inp, ys_tpl, ys_seg, ys_pos, msk in train_data:
             batch_acm += 1

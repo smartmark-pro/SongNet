@@ -23,6 +23,7 @@ python3 -u train.py --embed_dim 768 \
                       --print_every 100 \
                       --save_every 1000 \
                       --save_dir ckpt \
-                      --backend nccl
-                      --eval_batch_size 4
-                      --start_from ./model/epoch3_batch_1009999.ckpt
+                      --backend nccl \
+                      --eval_batch_size 4 \
+                      --start_from ./model/epoch3_batch_1009999.ckpt \
+                      --max_epoch 30
