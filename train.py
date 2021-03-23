@@ -47,7 +47,8 @@ def parse_config():
     parser.add_argument('--MASTER_PORT', type=str)
     parser.add_argument('--start_rank', type=int)
     parser.add_argument('--backend', type=str)
-    parser.add_argument('--eval_batch_size', type=str)
+    parser.add_argument('--eval_batch_size', type=int)
+    parser.add_argument('--max_epoch', type=int)
 
     return parser.parse_args()
 
