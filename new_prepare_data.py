@@ -79,6 +79,7 @@ print("类别数量, 错误结果", len(category_data), c)
 all, tc, sulian, sulianc, not_select = 0, 0, 0, 0, 0
 tokens, sentences = collections.defaultdict(int), collections.defaultdict(int)
 new_category_data = collections.defaultdict(list)
+other_data = []
 for k, v in category_data.items():
     if len(v) >= 4:  # 一个梗至少有四个仿写
 
@@ -98,10 +99,11 @@ for k, v in category_data.items():
     else:
         # print("少于四条", k, len(v))
         not_select += 1
+        other_data += v
 
 # 梗数量, 条数
 print()
-print("梗数量, 条数", tc, all, sulian, sulianc, not_select)
+print("梗数量, 条数", tc, all, sulian, sulianc, not_select, len(other_data))
 
 # 想办法直接打印这张表, 手工改, 肯定时太麻烦了
 
@@ -327,6 +329,8 @@ for k, v in new_category_data.items():
 new_train_data = get_data_by_mount(new_train_data, "train")
 new_dev_data = get_data_by_mount(new_dev_data, "dev")
 new_test_data = get_data_by_mount(new_test_data, "test")
+
+other_data = get_data_by_mount(other_data, "other")
 
 print("vocab")
 print(len(cnt))  # 5310 + 1024+9 + 64 = 6407 + 几个字.
