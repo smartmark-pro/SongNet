@@ -4,6 +4,7 @@ import numpy as np
 import myers
 # from pypinyin import Style, lazy_pinyin
 from LAC import LAC
+from numpy.lib.function_base import diff
 from paddle.fluid.data import data
 from typing_extensions import final
 from data import PUNCS
@@ -26,6 +27,26 @@ lac = LAC(mode="lac")
 
 # 标准类别, 对应回答结果
 # 自定义类别形式呢
+
+
+def new_eval_tpl2(sents1, sents2):
+    n = 0.
+    # 原来统计标点是因为,只有一个韵脚
+    # 当前实际应当统计模板字符是否相等
+    if len(sents1) > len(sents2):
+        # 因为存在误差的情况
+        # for i in range(len(sents2)):
+        #     if
+        sents1 = sents1[:len(sents2)]
+    for i in range(len(sents1)):
+        if sents1[i] == sents2[i]:
+            n += 1
+
+    p = n / len(sents2)
+    r = n / len(sents1)
+    f = 2 * p * r / (p + r + 1e-16)
+
+    return p, r, f, n, len(sents1), len(sents2)
 
 
 def new_eval_tpl(sents1, sents2, tpl, tag="_"):
@@ -170,8 +191,16 @@ def eval_analogy(sents1, sents2, tpl_sents):
     p = n / (n2 + 1e-16)
     r = n / (n1 + 1e-16)
     f1 = 2 * p * r / (p + r + 1e-16)
+
     return p, r, f1, n, n1, n2
 
+
+# def eval_analogy3(sents1, sents2, tpl_sents, tag="_"):
+#     # 感觉怎么搞都不太行, 预测的水平过低
+#     p = n / (n2 + 1e-16)
+#     r = n / (n1 + 1e-16)
+#     f1 = 2 * p * r / (p + r + 1e-16)
+#     return p, r, f1, n, n1, n2
 
 def eval_analogy2(sents1, sents2, tpl_sents, tag="_"):
     """只能得到一个较为模糊的值, 最长公共字串似乎会好一点, 统计字数, 这里是词的数量, 还是不太行啊"""
@@ -198,21 +227,21 @@ def eval_analogy2(sents1, sents2, tpl_sents, tag="_"):
     return p, r, f1, n, n1, n2
 
 
-def eval_endings(sents1, sents2):
-    n = 0.
-    if len(sents1) > len(sents2):
-        sents1 = sents1[:len(sents2)]
+# def eval_endings(sents1, sents2):
+#     n = 0.
+#     if len(sents1) > len(sents2):
+#         sents1 = sents1[:len(sents2)]
 
-    sents0 = []
-    for si, sent1 in enumerate(sents1):
-        sent2 = sents2[si]
-        if len(sent2) <= len(sent1):
-            sents0.append(sent2)
-        else:
-            sents0.append(sent2[:len(sent1) - 1] + sent1[-1])
+#     sents0 = []
+#     for si, sent1 in enumerate(sents1):
+#         sent2 = sents2[si]
+#         if len(sent2) <= len(sent1):
+#             sents0.append(sent2)
+#         else:
+#             sents0.append(sent2[:len(sent1) - 1] + sent1[-1])
 
-    sent = "</s>".join(sents0)
-    return sent
+#     sent = "</s>".join(sents0)
+#     return sent
 
 
 def align_part(origin, content, mask_tag="_"):
@@ -244,12 +273,40 @@ def align_part(origin, content, mask_tag="_"):
     return rs, count
 
 
+def get_sent2_tpl(sents2, tpl_sents):
+    s2 = "".join(sents2)
+    tpl = "".join(tpl_sents)
+    tpl = "".join(tpl.split("_"))
+
+    new_tpl, c = align_part(tpl, s2)  # 会得到一个和s2完全一样长的模板
+    assert len(new_tpl) == len(s2)
+    common_s2, diff_s2, sents2_tpl = [], [], []
+    k = 0
+    for i in range(len(sents2)):
+        c, d, t = [], [], []
+        for j in range(len(sents2[i])):
+            if new_tpl[k] == sents2[i][j]:
+                c.append(sents2[i][j])
+            else:
+                d.append(sents2[i][j])
+            t.append(new_tpl[k])
+            k += 1
+        common_s2.append("".join(c))
+        diff_s2.append("".join(d))
+        sents2_tpl.append("".join(t))
+    assert len(common_s2) == len(diff_s2)
+    return common_s2, diff_s2, new_tpl, sents2_tpl
+
+
 def eval_disverse(sents2):
 
     ugrams = [w for w in ''.join(sents2)]
+
     bigrams = []
     for bi in range(len(ugrams) - 1):
         bigrams.append(ugrams[bi] + ugrams[bi+1])
+    if len(ugrams) == 0 or len(bigrams) == 0:
+        return 0, 0, [], []
     d1 = len(set(ugrams)) / float(len(ugrams))
     d2 = len(set(bigrams)) / float(len(bigrams))
     return d1, d2, ugrams, bigrams
@@ -281,7 +338,7 @@ def eval(res_file, fid):
     p__, r__, f1__ = 0., 0., 0.
     n0__, n1__, n2__ = 0., 0., 0.
     d1_, d2_ = 0., 0.
-    d4ends = []
+    # d4ends = []
 
     def get_clear_sent(sents):
         sents_ = []
@@ -298,20 +355,14 @@ def eval(res_file, fid):
         sents2 = y.split("</s>")
         sents1 = get_clear_sent(sents1)
         sents2 = get_clear_sent(sents2)
-        tpl_sents = tpl.split("</s>")
-        tpl_sents = get_clear_sent(tpl_sents)
+        sents1_tpl = tpl.split("</s>")
+        sents1_tpl = get_clear_sent(sents1_tpl)
         # 需要一个函数将sents2 拆成两个
-        s2 = "".join(sents2)
-        tpl = "".join(tpl_sents)
-        new_tpl, c = align_part(tpl, s2)  # 会得到一个和s2完全一样长的模板
-        common_s2, diff_s2 = [], []
-        for i in range(len(new_tpl)):
-            if new_tpl[i] == s2[i]:
-                common_s2.append(s2[i])
-            else:
-                diff_s2.append(s2[i])
+        common_s2, diff_s2, new_tpl, sents2_tpl = get_sent2_tpl(
+            sents2, sents1_tpl)
         # 这个似乎没啥问题, 但是好像评价的时候应该用模板啊, 直接用content, 也行吧
-        p, r, f1, n0, n1, n2 = new_eval_tpl(sents1, sents2, tpl_sents)
+        p, r, f1, n0, n1, n2 = new_eval_tpl(
+            sents1, sents2, sents1_tpl)  # 直接通过模板得到的仍然会偏低
         p_ += p
         r_ += r
         f1_ += f1
@@ -320,13 +371,13 @@ def eval(res_file, fid):
         n2_ += n2
 
         # 结构相关贡献值? 就是应该在一个范围吧, 不能太高的
-        d1, d2, ugrams, bigrams = eval_disverse(sents1, sents2, tpl_sents)
+        d1, d2, ugrams, bigrams = eval_disverse(diff_s2)
         d1_ += d1
         d2_ += d2
         ugrams_ += ugrams
         bigrams_ += bigrams
 
-        p, r, f1, n0, n1, n2 = eval_analogy(sents1, sents2, tpl_sents)
+        p, r, f1, n0, n1, n2 = eval_analogy(sents1, sents2, sents1_tpl)
         p__ += p
         r__ += r
         f1__ += f1
@@ -334,8 +385,8 @@ def eval(res_file, fid):
         n1__ += n1
         n2__ += n2
 
-        d4end = eval_endings(sents1, sents2)
-        d4ends.append(new_topic + "<s1>" + topic + "<s2>" + d4end)
+        # d4end = eval_endings(sents1, sents2)
+        # d4ends.append(new_topic + "<s1>" + topic + "<s2>" + d4end)
 
     tpl_macro_p = p_ / len(docs)
     tpl_macro_r = r_ / len(docs)
@@ -356,9 +407,9 @@ def eval(res_file, fid):
     micro_dist1 = len(set(ugrams_)) / float(len(ugrams_))
     micro_dist2 = len(set(bigrams_)) / float(len(bigrams_))
 
-    with open("./results_4ending/res4end" + str(fid) + ".txt", "w") as fo:
-        for line in d4ends:
-            fo.write(line + "\n")
+    # with open("./results_4ending/res4end" + str(fid) + ".txt", "w") as fo:
+    #     for line in d4ends:
+    #         fo.write(line + "\n")
     return tpl_macro_f1, tpl_micro_f1, rhy_macro_f1, rhy_micro_f1, macro_dist1, micro_dist1, macro_dist2, micro_dist2
 
 
@@ -395,7 +446,6 @@ def get_metrics_tabel(abalation):
     print("\\\\")
     print()
 
-
     # print("tpl_macro_f1", np.mean(tpl_macro_f1_), np.std(tpl_macro_f1_, ddof=1))
     # print("tpl_micro_f1", np.mean(tpl_micro_f1_), np.std(tpl_micro_f1_, ddof=1))
     # print("rhy_macro_f1", np.mean(rhy_macro_f1_), np.std(rhy_macro_f1_, ddof=1))
@@ -406,9 +456,10 @@ def get_metrics_tabel(abalation):
     # print("micro_dist2", np.mean(micro_dist2_), np.std(micro_dist2_, ddof=1))
 # get_metrics_tabel("top-32-test1-1-2999")
 # get_metrics_tabel("top-32-test1-2-2999")
-#
-# get_metrics_tabel("other1-top-32")
-# get_metrics_tabel("other2-top-32")
+
+
+get_metrics_tabel("other1-top-32")
+get_metrics_tabel("other2-top-32")
 # other1-top-32
-get_metrics_tabel("top-32-test1-1-2999")
+# get_metrics_tabel("top-32-test1-1-2999")
 # get_metrics_tabel("other2-top-32")
