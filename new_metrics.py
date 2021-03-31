@@ -193,8 +193,8 @@ def eval_analogy(sents1, sents2, tpl_sents):
     r = n / (n1 + 1e-16)
     f1 = 2 * p * r / (p + r + 1e-16)
 
-    # if f1 > 0.4:
-    #     print("".join(sents1), "".join(sents2))
+    if f1 > 0.4:
+        print("".join(sents1), "".join(sents2))
     return p, r, f1, n, n1, n2
 
 
@@ -315,6 +315,15 @@ def eval_disverse(sents2):
     return d1, d2, ugrams, bigrams
 
 
+def get_clear_sent(sents):
+    sents_ = []
+    for sent in sents:
+        sent = sent.strip()
+        if sent:
+            sents_.append(sent)
+    return sents_
+
+
 def eval(res_file, fid):
     docs = []
     with open(res_file) as f:
@@ -343,13 +352,7 @@ def eval(res_file, fid):
     d1_, d2_ = 0., 0.
     # d4ends = []
 
-    def get_clear_sent(sents):
-        sents_ = []
-        for sent in sents:
-            sent = sent.strip()
-            if sent:
-                sents_.append(sent)
-        return sents_
+    
     for x, content, y in docs:
         topic, tpl = x.split("<s2>")
         new_topic, topic = topic.split("<s1>")
