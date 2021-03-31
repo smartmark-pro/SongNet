@@ -21,6 +21,7 @@ final_pos["vd"] = "d"
 final_pos["vn"] = "n"
 final_pos["ad"] = "d"
 final_pos["an"] = "n"
+final_pos[""] = ""
 
 
 lac = LAC(mode="lac")
@@ -192,6 +193,8 @@ def eval_analogy(sents1, sents2, tpl_sents):
     r = n / (n1 + 1e-16)
     f1 = 2 * p * r / (p + r + 1e-16)
 
+    # if f1 > 0.4:
+    #     print("".join(sents1), "".join(sents2))
     return p, r, f1, n, n1, n2
 
 
@@ -418,7 +421,7 @@ def get_metrics_tabel(abalation):
     tpl_macro_f1_, tpl_micro_f1_, rhy_macro_f1_, rhy_micro_f1_,  \
         macro_dist1_, micro_dist1_, macro_dist2_, micro_dist2_ = [], [], [], [], [], [], [], []
     # abalation = "top-32"
-    for i in range(1):
+    for i in range(5):
         f_name = "./results/"+abalation+"/out" + str(i+1)+".txt"
         if not os.path.exists(f_name):
             continue
@@ -458,7 +461,8 @@ def get_metrics_tabel(abalation):
 # get_metrics_tabel("top-32-test1-2-2999")
 
 
-get_metrics_tabel("other1-top-32")
+# get_metrics_tabel("other1-top-32")
+
 get_metrics_tabel("other2-top-32")
 # other1-top-32
 # get_metrics_tabel("top-32-test1-1-2999")
